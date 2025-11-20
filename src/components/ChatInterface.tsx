@@ -17,6 +17,7 @@ interface ChatInterfaceProps {
 export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen }: ChatInterfaceProps) {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [loadingStatus, setLoadingStatus] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { messages, addMessage, setStreaming, updateStats, setCurrentContext, setCurrentSearchResults } = useChatStore()
@@ -48,6 +49,7 @@ export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen
 
       // Perform RAG query if enabled and files are available
       if (settings.toolsConfig.rag && files.length > 0) {
+        setLoadingStatus('🔍 Searching knowledge base...')
         const fileIds = selectedFiles.length > 0 ? selectedFiles : files.map(f => f.id)
         ragResults = await ragQuery(userQuery, fileIds, 3)
         setCurrentContext(ragResults)
@@ -62,6 +64,7 @@ export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen
 
       // Perform web search if enabled
       if (settings.toolsConfig.webSearch) {
+        setLoadingStatus('🌐 Searching the web...')
         searchResults = await webSearch(userQuery, 3)
         setCurrentSearchResults(searchResults)
         
@@ -74,6 +77,7 @@ export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen
       }
 
       // Combine context with user query
+      setLoadingStatus('🤖 Generating response...')
       const enhancedPrompt = contextText 
         ? `${contextText}\n--- User Question ---\n${userQuery}\n\nPlease answer the question using the context provided above.`
         : userQuery
@@ -123,6 +127,7 @@ export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen
     } finally {
       setIsLoading(false)
       setStreaming(false)
+      setLoadingStatus('')
     }
   }
 
@@ -195,6 +200,16 @@ export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen
 
       {/* Messages */}
       <MessageList messages={messages} isLoading={isLoading} />
+
+      {/* Loading Status Indicator */}
+      {loadingStatus && (
+        <div className="px-8 pb-2">
+          <div className="glass-panel px-4 py-2 inline-flex items-center gap-2 text-sm text-primary">
+            <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+            {loadingStatus}
+          </div>
+        </div>
+      )}
 
       {/* Input Area */}
       <div className="glass-panel m-4 mt-0 p-4">

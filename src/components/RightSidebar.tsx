@@ -1,7 +1,9 @@
-import { FileText, Database, Activity } from 'lucide-react'
+import { FileText, Database, Activity, Trash2, Loader2 } from 'lucide-react'
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { useFileStore } from '../store/fileStore'
 import { useChatStore } from '../store/chatStore'
+import { deleteFile } from '../api/files'
 
 export default function RightSidebar() {
   const [activeTab, setActiveTab] = useState<'files' | 'stats' | 'context'>('stats')
@@ -87,34 +89,77 @@ function StatsPanel() {
 }
 
 function FilesPanel() {
-  const { files } = useFileStore()
+  const { files, removeFile } = useFileStore()
+  const [deletingFile, setDeletingFile] = useState<string | null>(null)
+
+  const handleDeleteFile = async (fileId: string) => {
+    if (!confirm('Are you sure you want to delete this file from the knowledge base?')) {
+      return
+    }
+
+    setDeletingFile(fileId)
+    try {
+      await deleteFile(fileId)
+      removeFile(fileId)
+    } catch (error) {
+      console.error('Failed to delete file:', error)
+      alert('Failed to delete file. Please try again.')
+    } finally {
+      setDeletingFile(null)
+    }
+  }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-400">Uploaded Files</h3>
+        <h3 className="text-sm font-semibold text-gray-400">Knowledge Base</h3>
         <span className="text-xs text-gray-500">{files.length} files</span>
       </div>
 
       {files.length === 0 ? (
         <div className="text-center py-8 text-gray-500 text-sm">
-          No files uploaded yet
+          <Database className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <p>No files in knowledge base</p>
+          <p className="text-xs mt-1">Upload files to enable RAG</p>
         </div>
       ) : (
         <div className="space-y-2">
           {files.map((file) => (
-            <div key={file.id} className="bg-glass-bg rounded-lg p-3">
+            <motion.div
+              key={file.id}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 10 }}
+              className="bg-glass-bg rounded-lg p-3 hover:bg-glass-hover transition-colors group"
+            >
               <div className="flex items-start justify-between gap-2">
-                <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <FileText className="w-4 h-4 flex-shrink-0 mt-0.5 text-primary" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{file.name}</div>
-                  <div className="text-xs text-gray-500">
-                    {(file.size / 1024).toFixed(1)} KB
-                    {file.chunks && ` · ${file.chunks} chunks`}
+                  <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
+                    <span>{(file.size / 1024).toFixed(1)} KB</span>
+                    {file.chunks && (
+                      <>
+                        <span>·</span>
+                        <span>{file.chunks} chunks</span>
+                      </>
+                    )}
                   </div>
                 </div>
+                <button
+                  onClick={() => handleDeleteFile(file.id)}
+                  disabled={deletingFile === file.id}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 rounded transition-all disabled:opacity-50"
+                  title="Delete file"
+                >
+                  {deletingFile === file.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-red-400" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 text-red-400" />
+                  )}
+                </button>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       )}
