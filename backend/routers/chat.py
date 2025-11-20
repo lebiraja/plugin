@@ -18,11 +18,17 @@ class ModelConfig(BaseModel):
     presencePenalty: float = 0.0
 
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
 class ChatRequest(BaseModel):
     message: str
     backend: str
     model: str
     config: ModelConfig
+    history: List[ChatMessage] = []
 
 
 class ChatResponse(BaseModel):
@@ -36,11 +42,15 @@ class ChatResponse(BaseModel):
 async def send_message(request: ChatRequest):
     """Send a message and get a response from the LLM"""
     try:
+        # Convert history to dict format
+        history_dicts = [msg.dict() for msg in request.history]
+        
         response = await llm_service.generate_response(
             message=request.message,
             backend=request.backend,
             model=request.model,
             config=request.config.dict(),
+            history=history_dicts,
         )
         return response
     except Exception as e:

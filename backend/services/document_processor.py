@@ -24,16 +24,22 @@ class DocumentProcessor:
         file_ext = Path(file_path).suffix.lower()
 
         # Extract text based on file type
-        if file_ext == ".pdf":
-            text = self._extract_pdf(file_path)
-        elif file_ext == ".docx":
-            text = self._extract_docx(file_path)
-        elif file_ext == ".txt":
-            text = self._extract_txt(file_path)
-        elif file_ext in [".jpg", ".jpeg", ".png"]:
-            text = self._extract_image_text(file_path)
-        else:
-            raise ValueError(f"Unsupported file type: {file_ext}")
+        try:
+            if file_ext == ".pdf":
+                text = await self._extract_pdf(file_path)
+            elif file_ext == ".docx":
+                text = await self._extract_docx(file_path)
+            elif file_ext == ".txt":
+                text = await self._extract_txt(file_path)
+            elif file_ext in [".jpg", ".jpeg", ".png"]:
+                text = await self._extract_image_text(file_path)
+            else:
+                raise ValueError(f"Unsupported file type: {file_ext}")
+        except Exception as e:
+            raise ValueError(f"Failed to extract text from {filename}: {str(e)}")
+
+        if not text or not text.strip():
+            raise ValueError(f"No text content extracted from {filename}")
 
         # Split into chunks
         chunks = self._chunk_text(text)
@@ -61,25 +67,27 @@ class DocumentProcessor:
         if results["ids"]:
             self.collection.delete(ids=results["ids"])
 
-    def _extract_pdf(self, file_path: str) -> str:
+    async def _extract_pdf(self, file_path: str) -> str:
         """Extract text from PDF"""
         reader = PdfReader(file_path)
         text = ""
         for page in reader.pages:
-            text += page.extract_text() + "\n"
+            extracted = page.extract_text()
+            if extracted:
+                text += extracted + "\n"
         return text
 
-    def _extract_docx(self, file_path: str) -> str:
+    async def _extract_docx(self, file_path: str) -> str:
         """Extract text from DOCX"""
         doc = DocxDocument(file_path)
-        return "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        return "\n".join([paragraph.text for paragraph in doc.paragraphs if paragraph.text])
 
-    def _extract_txt(self, file_path: str) -> str:
+    async def _extract_txt(self, file_path: str) -> str:
         """Extract text from TXT"""
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
             return f.read()
 
-    def _extract_image_text(self, file_path: str) -> str:
+    async def _extract_image_text(self, file_path: str) -> str:
         """Extract text from image using OCR"""
         image = Image.open(file_path)
         return pytesseract.image_to_string(image)

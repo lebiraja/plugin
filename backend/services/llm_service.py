@@ -13,14 +13,16 @@ class LLMService:
         }
 
     async def generate_response(
-        self, message: str, backend: str, model: str, config: Dict[str, Any]
+        self, message: str, backend: str, model: str, config: Dict[str, Any], history: list = None
     ) -> Dict[str, Any]:
         """Generate a response from the specified backend"""
+        if history is None:
+            history = []
         
         if backend == "ollama-default":
-            return await self._ollama_generate(message, model, config)
+            return await self._ollama_generate(message, model, config, history)
         elif backend == "lmstudio-default":
-            return await self._lmstudio_generate(message, model, config)
+            return await self._lmstudio_generate(message, model, config, history)
         else:
             raise ValueError(f"Unsupported backend: {backend}")
 
@@ -37,14 +39,27 @@ class LLMService:
                 yield chunk
 
     async def _ollama_generate(
-        self, message: str, model: str, config: Dict[str, Any]
+        self, message: str, model: str, config: Dict[str, Any], history: list = None
     ) -> Dict[str, Any]:
         """Generate response using Ollama"""
         url = f"{self.backend_urls['ollama-default']}/api/generate"
         
+        # Build context from history
+        prompt = message
+        if history:
+            context_messages = []
+            for msg in history[-10:]:
+                role = msg.get('role', 'user')
+                content = msg.get('content', '')
+                prefix = "User: " if role == 'user' else "Assistant: "
+                context_messages.append(f"{prefix}{content}")
+            
+            context = "\n".join(context_messages)
+            prompt = f"{context}\nUser: {message}\nAssistant:"
+        
         payload = {
             "model": model,
-            "prompt": message,
+            "prompt": prompt,
             "stream": False,
             "options": {
                 "temperature": config.get("temperature", 0.7),
@@ -70,14 +85,23 @@ class LLMService:
         }
 
     async def _lmstudio_generate(
-        self, message: str, model: str, config: Dict[str, Any]
+        self, message: str, model: str, config: Dict[str, Any], history: list = None
     ) -> Dict[str, Any]:
         """Generate response using LM Studio"""
         url = f"{self.backend_urls['lmstudio-default']}/v1/chat/completions"
         
+        # Build messages from history
+        messages = []
+        if history:
+            # Include last 10 messages for context
+            messages = history[-10:]
+        
+        # Add current message
+        messages.append({"role": "user", "content": message})
+        
         payload = {
             "model": model,
-            "messages": [{"role": "user", "content": message}],
+            "messages": messages,
             "temperature": config.get("temperature", 0.7),
             "top_p": config.get("topP", 0.9),
             "max_tokens": config.get("maxTokens", 2048),

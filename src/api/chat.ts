@@ -18,7 +18,8 @@ export async function sendMessage(
   message: string,
   backend: string,
   model: string,
-  config: ModelConfig
+  config: ModelConfig,
+  history: Array<{role: string, content: string}> = []
 ): Promise<ChatResponse> {
   try {
     const response = await axios.post<ChatResponse>(`${API_BASE_URL}/chat`, {
@@ -26,6 +27,7 @@ export async function sendMessage(
       backend,
       model,
       config,
+      history,
     })
     
     return response.data

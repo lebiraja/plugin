@@ -78,11 +78,18 @@ export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen
         ? `${contextText}\n--- User Question ---\n${userQuery}\n\nPlease answer the question using the context provided above.`
         : userQuery
 
+      // Build conversation history (last 10 messages)
+      const history = messages.slice(-10).map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+
       const response = await sendMessage(
         enhancedPrompt,
         settings.activeBackend,
         settings.activeModel,
-        settings.modelConfig
+        settings.modelConfig,
+        history
       )
 
       const latency = Date.now() - startTime

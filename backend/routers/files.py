@@ -21,14 +21,20 @@ async def upload_file(file: UploadFile = File(...)):
         file_id = str(uuid.uuid4())
         file_extension = Path(file.filename).suffix
         file_path = UPLOAD_DIR / f"{file_id}{file_extension}"
+        
+        print(f"Processing file upload: {file.filename} ({file_extension})")
 
         # Save file
         async with aiofiles.open(file_path, "wb") as f:
             content = await file.read()
             await f.write(content)
+        
+        print(f"File saved to: {file_path}, size: {len(content)} bytes")
 
         # Process file
         chunks = await document_processor.process_file(str(file_path), file.filename)
+        
+        print(f"File processed successfully: {len(chunks)} chunks created")
 
         return {
             "fileId": file_id,
@@ -38,6 +44,9 @@ async def upload_file(file: UploadFile = File(...)):
             "chunks": len(chunks),
         }
     except Exception as e:
+        print(f"File upload error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
