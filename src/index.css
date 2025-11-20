@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-glass-border;
+  }
+  
+  body {
+    @apply bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-gray-100 font-sans antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-glass-bg backdrop-blur-xl border border-glass-border rounded-2xl shadow-glass;
+  }
+
+  .glass-button {
+    @apply px-4 py-2 rounded-xl bg-glass-bg backdrop-blur-sm border border-glass-border hover:bg-glass-hover transition-all duration-200;
+  }
+
+  .glass-input {
+    @apply bg-glass-bg backdrop-blur-sm border border-glass-border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all;
+  }
+
+  .message-bubble {
+    @apply rounded-2xl px-4 py-3 backdrop-blur-sm border;
+  }
+
+  .user-message {
+    @apply bg-primary/20 border-primary/30;
+  }
+
+  .assistant-message {
+    @apply bg-glass-bg border-glass-border;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded-full hover:bg-gray-500;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

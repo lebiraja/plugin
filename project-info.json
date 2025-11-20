@@ -1,0 +1,110 @@
+{
+  "name": "Local LLM Chat Interface",
+  "version": "1.0.0",
+  "description": "Modern Apple-inspired UI for local LLMs",
+  
+  "features": {
+    "ui": [
+      "Apple-inspired liquid-glass design",
+      "Dark theme with frosted surfaces",
+      "Smooth animations with Framer Motion",
+      "Responsive layout with collapsible sidebars"
+    ],
+    "llm_backends": [
+      "Ollama",
+      "LM Studio",
+      "HuggingFace (extendable)",
+      "Custom API endpoints"
+    ],
+    "tools": [
+      "Web Search (DuckDuckGo)",
+      "RAG (Retrieval-Augmented Generation)",
+      "Deep Research",
+      "File Upload (PDF, DOCX, TXT, images with OCR)"
+    ],
+    "stats": [
+      "Real-time token counting",
+      "Latency tracking",
+      "Session analytics",
+      "Cost estimation"
+    ]
+  },
+
+  "tech_stack": {
+    "frontend": {
+      "framework": "React 18",
+      "language": "TypeScript",
+      "build_tool": "Vite",
+      "styling": "TailwindCSS",
+      "animations": "Framer Motion",
+      "state": "Zustand",
+      "http": "Axios"
+    },
+    "backend": {
+      "framework": "FastAPI",
+      "language": "Python 3.9+",
+      "vector_db": "ChromaDB",
+      "embeddings": "Sentence Transformers",
+      "document_processing": ["PyPDF", "python-docx", "Pillow"],
+      "ocr": "Tesseract"
+    }
+  },
+
+  "installation": {
+    "requirements": {
+      "node": "18+",
+      "python": "3.9+",
+      "optional": ["Ollama", "LM Studio"]
+    },
+    "steps": [
+      "npm install (frontend)",
+      "cd backend && pip install -r requirements.txt",
+      "Run ./start.ps1 or start manually"
+    ]
+  },
+
+  "ports": {
+    "frontend": 3000,
+    "backend": 8000
+  },
+
+  "urls": {
+    "frontend": "http://localhost:3000",
+    "backend": "http://localhost:8000",
+    "api_docs": "http://localhost:8000/docs"
+  },
+
+  "file_structure": {
+    "frontend": "src/",
+    "backend": "backend/",
+    "components": "src/components/",
+    "stores": "src/store/",
+    "api": "src/api/",
+    "routers": "backend/routers/",
+    "services": "backend/services/"
+  },
+
+  "key_files": {
+    "entry_frontend": "src/main.tsx",
+    "entry_backend": "backend/main.py",
+    "config_frontend": "vite.config.ts",
+    "config_backend": "backend/config.py",
+    "styles": "src/index.css",
+    "tailwind": "tailwind.config.js"
+  },
+
+  "development": {
+    "start_script": "start.ps1",
+    "frontend_dev": "npm run dev",
+    "backend_dev": "python backend/main.py",
+    "build": "npm run build",
+    "lint": "npm run lint"
+  },
+
+  "customization": {
+    "add_backend": "src/store/settingsStore.ts",
+    "modify_theme": "tailwind.config.js",
+    "add_route": "backend/routers/",
+    "add_service": "backend/services/"
+  }
+}
