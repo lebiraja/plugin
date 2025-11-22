@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import ChatInterface from "./components/ChatInterface";
+import { UnifiedChatInterface } from "./components/UnifiedChatInterface";
 import LeftSidebar from "./components/LeftSidebar";
 import RightSidebar from "./components/RightSidebar";
 import SettingsModal from "./components/SettingsModal";
@@ -20,7 +20,7 @@ function App() {
 
         {/* Main Chat Area */}
         <main className="flex-1 flex flex-col overflow-hidden">
-          <ChatInterface
+          <UnifiedChatInterface
             onToggleRightSidebar={() =>
               setIsRightSidebarOpen(!isRightSidebarOpen)
             }

@@ -32,7 +32,7 @@ logging.getLogger("watchfiles.main").setLevel(logging.WARNING)
 # Load environment variables
 load_dotenv()
 
-from routers import chat, files, models, tools, health
+from routers import chat, files, models, tools, health, deep_research
 
 app = FastAPI(title="Local LLM Chat API", version="1.0.0")
 
@@ -56,6 +56,9 @@ app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(files.router, prefix="/api/files", tags=["files"])
 app.include_router(models.router, prefix="/api/models", tags=["models"])
 app.include_router(tools.router, prefix="/api/tools", tags=["tools"])
+app.include_router(
+    deep_research.router, prefix="/api/deep-research", tags=["deep-research"]
+)
 
 
 @app.get("/")

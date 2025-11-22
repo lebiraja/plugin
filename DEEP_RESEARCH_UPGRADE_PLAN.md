@@ -1,0 +1,760 @@
+# Deep Research System - Comprehensive Upgrade Plan
+
+## Current State Analysis
+
+### Existing Implementation
+
+**Location**: `src/components/ChatInterface.tsx` (lines 60-100)
+
+**Current Capabilities**:
+
+- ✅ Web search using enhanced `search_service.py` (Serper.dev + DuckDuckGo)
+- ✅ Content scraping with relevance scoring
+- ✅ RAG integration for uploaded documents
+- ✅ Basic context aggregation
+- ✅ Settings toggle: `settings.toolsConfig.deepResearch` (currently unused)
+
+**Current Limitations**:
+
+- ❌ `deepResearch` flag exists but does nothing
+- ❌ No multi-hop reasoning or iterative research
+- ❌ No research planning phase
+- ❌ No structured evidence collection
+- ❌ No synthesis or final report generation
+- ❌ No export functionality (PDF/Markdown)
+- ❌ No UI for research progress visualization
+- ❌ Single-pass search only (no recursive refinement)
+
+---
+
+## Upgrade Architecture
+
+### Phase 1: Backend Research Engine (Priority: HIGH)
+
+#### 1.1 Create Deep Research Service
+
+**File**: `backend/services/deep_research_service.py`
+
+```python
+class DeepResearchService:
+    """
+    Multi-stage research agent with:
+    - Research plan generation
+    - Recursive search expansion
+    - Multi-source synthesis
+    - Evidence tracking
+    """
+```
+
+**Core Components**:
+
+**A. Research Planner** (using LLM)
+
+- Input: User query
+- Output: Structured research plan
+  ```python
+  {
+    "main_question": str,
+    "sub_questions": List[str],
+    "search_queries": List[str],
+    "required_depth": int,  # 1-3 levels
+    "focus_areas": List[str]
+  }
+  ```
+
+**B. Multi-Level Search Orchestrator**
+
+- Execute searches in phases:
+  1. **Initial Search**: Top 10 results from primary queries
+  2. **Gap Analysis**: LLM identifies missing information
+  3. **Refinement Search**: Generate follow-up queries
+  4. **Deep Dive**: Scrape and analyze top 3-5 sources deeply
+
+**C. Evidence Collector**
+
+```python
+class Evidence:
+    source_url: str
+    title: str
+    content: str
+    relevance_score: float
+    extraction_time: datetime
+    content_chunks: List[ContentChunk]
+
+class ContentChunk:
+    text: str
+    topic_tags: List[str]
+    supports_question: str  # Which sub-question it answers
+    confidence: float
+```
+
+**D. Multi-Hop Reasoning Engine**
+
+- Compare evidence from multiple sources
+- Resolve contradictions using LLM
+- Identify consensus vs. outlier information
+- Generate intermediate conclusions
+- Track reasoning chain:
+  ```python
+  {
+    "step": 1,
+    "question": "What is X?",
+    "sources_consulted": [url1, url2],
+    "finding": "...",
+    "confidence": 0.85,
+    "contradictions": []
+  }
+  ```
+
+**E. Report Synthesizer**
+
+- Executive summary (200 words)
+- Detailed findings per sub-question
+- Supporting evidence with citations
+- Confidence levels and caveats
+- Recommendations for further research
+
+#### 1.2 Create Deep Research Router
+
+**File**: `backend/routers/deep_research.py`
+
+**Endpoints**:
+
+```python
+@router.post("/research")
+async def conduct_deep_research(request: DeepResearchRequest):
+    """
+    Main research endpoint
+    Returns: ResearchResult with full JSON structure
+    """
+
+@router.post("/research/export-pdf")
+async def export_research_pdf(request: ExportPDFRequest):
+    """
+    Export research report to PDF
+    Returns: StreamingResponse with PDF file
+    """
+
+@router.get("/research/{research_id}")
+async def get_research_result(research_id: str):
+    """
+    Retrieve saved research by ID
+    """
+```
+
+**Models**:
+
+```python
+class DeepResearchRequest(BaseModel):
+    query: str
+    max_depth: int = 2  # 1-3 research depth levels
+    max_sources: int = 15
+    include_academic: bool = False  # Future: Google Scholar
+    export_format: Optional[str] = None  # "json" | "pdf" | "markdown"
+
+class ResearchResult(BaseModel):
+    research_id: str
+    query: str
+    plan: ResearchPlan
+    evidence: List[Evidence]
+    reasoning_trace: List[ReasoningStep]
+    final_report: FinalReport
+    citations: List[Citation]
+    metadata: ResearchMetadata
+```
+
+#### 1.3 Enhance Search Service
+
+**File**: `backend/services/search_service.py` (already enhanced!)
+
+**Additional Features Needed**:
+
+- ✅ Already has: Content scraping, relevance scoring, caching
+- ➕ Add: Query expansion using LLM
+  ```python
+  async def expand_query(self, original_query: str) -> List[str]:
+      """Generate 3-5 related search queries"""
+  ```
+- ➕ Add: Source authority scoring (domain reputation)
+- ➕ Add: Freshness detection (prefer recent content)
+- ➕ Add: Duplicate content detection
+
+#### 1.4 PDF Generation Service
+
+**File**: `backend/services/pdf_generator.py`
+
+**Requirements**:
+
+- Use `reportlab` or `weasyprint`
+- Template-based generation
+- Sections:
+  1. Cover page (title, date, branding)
+  2. Executive summary
+  3. Research plan overview
+  4. Detailed findings (per sub-question)
+  5. Evidence appendix
+  6. Citations & references
+- Styling: Professional, clean, with proper typography
+- Logo: "Generated by PLUGIN Deep Research Engine"
+
+---
+
+### Phase 2: Frontend Integration (Priority: HIGH)
+
+#### 2.1 Create Deep Research Component
+
+**File**: `src/components/DeepResearch/DeepResearchPanel.tsx`
+
+**Features**:
+
+- Triggered when `settings.toolsConfig.deepResearch === true`
+- Replaces simple search in ChatInterface
+- Multi-stage progress UI:
+  ```tsx
+  <ResearchProgress>
+    <Stage status="completed">📋 Planning Research</Stage>
+    <Stage status="in-progress">🔍 Searching Sources</Stage>
+    <Stage status="pending">📄 Extracting Content</Stage>
+    <Stage status="pending">🧠 Analyzing Evidence</Stage>
+    <Stage status="pending">📝 Synthesizing Report</Stage>
+  </ResearchProgress>
+  ```
+
+#### 2.2 Research Results UI
+
+**File**: `src/components/DeepResearch/ResearchResultsView.tsx`
+
+**Layout**:
+
+```tsx
+<ResearchResults>
+  {/* Executive Summary Card */}
+  <SummaryCard>
+    <h2>Executive Summary</h2>
+    <p>{report.executive_summary}</p>
+    <ExportButton onClick={downloadPDF}>📥 Download PDF Report</ExportButton>
+  </SummaryCard>
+
+  {/* Research Plan */}
+  <ExpandableSection title="Research Plan">
+    <ul>
+      {plan.sub_questions.map((q) => (
+        <li>{q}</li>
+      ))}
+    </ul>
+  </ExpandableSection>
+
+  {/* Findings */}
+  <ExpandableSection title="Detailed Findings">
+    {findings.map((finding) => (
+      <FindingCard>
+        <h3>{finding.question}</h3>
+        <p>{finding.answer}</p>
+        <Citations>{finding.citations}</Citations>
+      </FindingCard>
+    ))}
+  </ExpandableSection>
+
+  {/* Sources */}
+  <ExpandableSection title="Sources Consulted">
+    {evidence.map((source) => (
+      <SourceCard>
+        <a href={source.url}>{source.title}</a>
+        <RelevanceScore score={source.relevance_score} />
+      </SourceCard>
+    ))}
+  </ExpandableSection>
+
+  {/* Reasoning Trace */}
+  <ExpandableSection title="Reasoning Steps">
+    <Timeline>
+      {reasoning.map((step) => (
+        <TimelineItem>
+          <strong>Step {step.step}</strong>: {step.question}
+          <br />
+          Finding: {step.finding}
+        </TimelineItem>
+      ))}
+    </Timeline>
+  </ExpandableSection>
+</ResearchResults>
+```
+
+#### 2.3 Update ChatInterface
+
+**File**: `src/components/ChatInterface.tsx`
+
+**Changes**:
+
+```typescript
+// Replace lines 60-100 with:
+if (settings.toolsConfig.deepResearch) {
+  // Use Deep Research mode
+  setLoadingStatus("🔬 Initiating deep research...");
+  const researchResult = await conductDeepResearch(userQuery, {
+    max_depth: 2,
+    max_sources: 15,
+  });
+
+  // Display research results in special UI
+  addMessage({
+    ...assistantMessage,
+    isResearchResult: true,
+    researchData: researchResult,
+  });
+} else {
+  // Use existing simple search
+  // ... current code ...
+}
+```
+
+#### 2.4 Add Research History Store
+
+**File**: `src/store/researchStore.ts`
+
+```typescript
+interface ResearchStore {
+  researches: ResearchResult[];
+  currentResearch: ResearchResult | null;
+  addResearch: (research: ResearchResult) => void;
+  getResearch: (id: string) => ResearchResult | null;
+  exportResearch: (id: string, format: "pdf" | "md") => Promise<void>;
+}
+```
+
+---
+
+### Phase 3: Advanced Features (Priority: MEDIUM)
+
+#### 3.1 Recursive Research
+
+**Algorithm**:
+
+```python
+async def recursive_research(query, max_depth=2, current_depth=0):
+    if current_depth >= max_depth:
+        return evidence
+
+    # Search & extract
+    results = await search_and_extract(query)
+
+    # Analyze gaps
+    gaps = await llm_identify_gaps(results, query)
+
+    if gaps:
+        # Generate follow-up queries
+        followup_queries = await llm_generate_followups(gaps)
+
+        # Recursive search
+        for fq in followup_queries:
+            additional = await recursive_research(
+                fq,
+                max_depth,
+                current_depth + 1
+            )
+            results.extend(additional)
+
+    return results
+```
+
+#### 3.2 Evidence Quality Scoring
+
+```python
+def calculate_evidence_score(evidence: Evidence) -> float:
+    """
+    Scoring factors:
+    - Source authority (domain trust score)
+    - Content freshness (recency)
+    - Content depth (word count, structure)
+    - Relevance to query (keyword match, semantic similarity)
+    - Citation presence (does it cite other sources?)
+    """
+    scores = {
+        'authority': score_domain_authority(evidence.source_url),
+        'freshness': score_freshness(evidence.extraction_time),
+        'depth': score_content_depth(evidence.content),
+        'relevance': evidence.relevance_score,
+        'citations': score_citation_presence(evidence.content)
+    }
+
+    # Weighted average
+    return (
+        scores['authority'] * 0.25 +
+        scores['freshness'] * 0.15 +
+        scores['depth'] * 0.20 +
+        scores['relevance'] * 0.30 +
+        scores['citations'] * 0.10
+    )
+```
+
+#### 3.3 Contradiction Resolution
+
+```python
+async def resolve_contradictions(evidence_list: List[Evidence]) -> Dict:
+    """
+    When sources disagree:
+    1. Identify contradicting claims
+    2. Check source authority
+    3. Look for consensus (majority view)
+    4. Present both sides with confidence levels
+    """
+    contradictions = await llm_detect_contradictions(evidence_list)
+
+    resolutions = []
+    for contradiction in contradictions:
+        resolution = await llm_resolve_contradiction(
+            claim_a=contradiction.claim_a,
+            claim_b=contradiction.claim_b,
+            sources=contradiction.sources
+        )
+        resolutions.append(resolution)
+
+    return resolutions
+```
+
+---
+
+### Phase 4: Performance & Reliability (Priority: HIGH)
+
+#### 4.1 Async Optimization
+
+- ✅ Already using `async/await` in search_service
+- ➕ Add: Parallel LLM calls for sub-questions
+  ```python
+  async def analyze_evidence_parallel(evidence_list):
+      tasks = [llm_analyze(e) for e in evidence_list]
+      return await asyncio.gather(*tasks)
+  ```
+
+#### 4.2 Caching Strategy
+
+- ✅ Already has: 1-hour content cache in search_service
+- ➕ Add: Research result cache (Redis or local JSON)
+  ```python
+  # Cache completed research for 24 hours
+  cache_key = f"research:{hash(query)}"
+  if cached := redis.get(cache_key):
+      return json.loads(cached)
+  ```
+
+#### 4.3 Error Handling
+
+```python
+class ResearchError(Exception):
+    """Base exception for research failures"""
+
+class SearchProviderError(ResearchError):
+    """All search providers failed"""
+
+class ContentExtractionError(ResearchError):
+    """Failed to extract content from all sources"""
+
+class LLMAnalysisError(ResearchError):
+    """LLM failed to analyze evidence"""
+
+# Graceful degradation:
+try:
+    results = await deep_research(query)
+except SearchProviderError:
+    # Fall back to simple search
+    results = await simple_search(query)
+except ContentExtractionError:
+    # Use snippets only
+    results = await search_without_scraping(query)
+```
+
+#### 4.4 Rate Limiting & Timeouts
+
+```python
+# Per-stage timeouts
+TIMEOUTS = {
+    'planning': 30,      # LLM plan generation
+    'search': 60,        # All searches combined
+    'scraping': 120,     # Content extraction
+    'analysis': 90,      # LLM evidence analysis
+    'synthesis': 60      # Final report generation
+}
+
+# API rate limits
+RATE_LIMITS = {
+    'serper_api': 100,   # requests per minute
+    'llm_api': 50,       # tokens per minute
+    'scraping': 20       # concurrent requests
+}
+```
+
+---
+
+### Phase 5: UI/UX Polish (Priority: MEDIUM)
+
+#### 5.1 Progress Animations
+
+```tsx
+<ResearchStage active={currentStage === "searching"}>
+  <Spinner />
+  <StatusText>
+    Searching {searchProgress.current}/{searchProgress.total} sources...
+  </StatusText>
+  <ProgressBar percent={searchProgress.percent} />
+</ResearchStage>
+```
+
+#### 5.2 Real-time Updates
+
+```typescript
+// Use Server-Sent Events (SSE) for progress streaming
+const eventSource = new EventSource("/api/deep-research/stream");
+
+eventSource.onmessage = (event) => {
+  const update = JSON.parse(event.data);
+
+  switch (update.type) {
+    case "stage_change":
+      setCurrentStage(update.stage);
+      break;
+    case "source_found":
+      addSource(update.source);
+      break;
+    case "analysis_complete":
+      setAnalysis(update.analysis);
+      break;
+  }
+};
+```
+
+#### 5.3 Export Options
+
+```tsx
+<ExportMenu>
+  <ExportButton onClick={() => export('pdf')}>
+    📄 Download PDF
+  </ExportButton>
+  <ExportButton onClick={() => export('markdown')}>
+    📝 Export Markdown
+  </ExportButton>
+  <ExportButton onClick={() => export('json')}>
+    💾 Save JSON
+  </ExportButton>
+  <CopyButton onClick={copyToClipboard}>
+    📋 Copy to Clipboard
+  </CopyButton>
+</ExportMenu>
+```
+
+---
+
+## Implementation Roadmap
+
+### Week 1: Core Backend (16-20 hours)
+
+- [ ] Create `deep_research_service.py` with basic structure
+- [ ] Implement Research Planner (LLM-based)
+- [ ] Implement Multi-Level Search Orchestrator
+- [ ] Add Evidence Collector
+- [ ] Create `deep_research.py` router with `/research` endpoint
+- [ ] Add unit tests for core logic
+
+### Week 2: Reasoning & Synthesis (12-16 hours)
+
+- [ ] Implement Multi-Hop Reasoning Engine
+- [ ] Add contradiction resolution
+- [ ] Implement Report Synthesizer
+- [ ] Add evidence quality scoring
+- [ ] Create recursive research algorithm
+- [ ] Test with complex multi-hop queries
+
+### Week 3: PDF Export & Frontend (16-20 hours)
+
+- [ ] Create `pdf_generator.py` service
+- [ ] Implement PDF template (ReportLab)
+- [ ] Add `/export-pdf` endpoint
+- [ ] Create `DeepResearchPanel.tsx` component
+- [ ] Create `ResearchResultsView.tsx` component
+- [ ] Update ChatInterface integration
+- [ ] Add `researchStore.ts` for state management
+
+### Week 4: Polish & Testing (12-16 hours)
+
+- [ ] Add progress streaming (SSE)
+- [ ] Implement real-time UI updates
+- [ ] Add export options (PDF, MD, JSON)
+- [ ] Performance optimization (caching, parallel processing)
+- [ ] Error handling & graceful degradation
+- [ ] End-to-end testing with real queries
+- [ ] Documentation & user guide
+
+---
+
+## Success Metrics
+
+**Quality**:
+
+- Research answers 90%+ of sub-questions generated
+- Citations include 10+ unique sources
+- Contradiction resolution identifies and explains conflicts
+- PDF reports are professionally formatted
+
+**Performance**:
+
+- Research completes in < 2 minutes for standard queries
+- No crashes or unhandled errors
+- Graceful degradation when services fail
+- Cache hit rate > 40% for repeated queries
+
+**User Experience**:
+
+- Clear progress indication at each stage
+- Ability to cancel long-running research
+- Export works on first try
+- Research results are easy to understand
+
+---
+
+## Technical Stack
+
+**Backend**:
+
+- Python 3.11+
+- FastAPI (already using)
+- `httpx` for async requests (already using)
+- `beautifulsoup4` for scraping (already using)
+- `sentence-transformers` for embeddings (already using)
+- **New**: `reportlab` or `weasyprint` for PDF generation
+- **New**: `redis` (optional) for caching
+
+**Frontend**:
+
+- React 18 + TypeScript (already using)
+- Zustand for state (already using)
+- **New**: Framer Motion for animations (already using)
+- **New**: EventSource API for SSE
+
+**LLM Integration**:
+
+- Ollama (already integrated)
+- LM Studio (already integrated)
+- Use existing `llm_service.py`
+
+---
+
+## Example Research Flow
+
+**User Query**: "What are the latest advances in quantum computing error correction?"
+
+**Stage 1: Planning** (10s)
+
+```
+Sub-questions generated:
+1. What is quantum error correction?
+2. What are recent breakthroughs (2024-2025)?
+3. Which companies/labs are leading?
+4. What are the key challenges?
+5. What are practical applications?
+
+Search queries:
+- "quantum error correction 2025 breakthrough"
+- "latest quantum computing error rates"
+- "surface code improvements quantum"
+- "IBM Google quantum error correction"
+```
+
+**Stage 2: Searching** (30s)
+
+```
+Found 23 sources:
+- Nature articles: 4
+- arXiv papers: 6
+- Company blogs: 5
+- News articles: 8
+```
+
+**Stage 3: Extracting** (60s)
+
+```
+Successfully scraped: 18/23 sources
+Total content: 45,000 words
+Relevant chunks extracted: 87
+```
+
+**Stage 4: Analyzing** (45s)
+
+```
+Answered sub-questions:
+1. ✅ Confidence: 95%
+2. ✅ Confidence: 88%
+3. ✅ Confidence: 92%
+4. ✅ Confidence: 85%
+5. ⚠️ Confidence: 70% (limited info)
+
+Contradictions found: 2
+- IBM vs Google on qubit count claims
+- Timeline predictions differ
+
+Recursive search triggered for Q5 → 5 new sources
+```
+
+**Stage 5: Synthesizing** (30s)
+
+```
+Executive Summary: 250 words
+Detailed Report: 1,200 words
+Citations: 18 sources
+Confidence: 87% overall
+```
+
+**Total Time**: ~3 minutes
+**Result**: Comprehensive report with PDF export option
+
+---
+
+## Files to Create
+
+```
+backend/
+├── services/
+│   ├── deep_research_service.py     ⭐ NEW (core logic)
+│   ├── pdf_generator.py              ⭐ NEW (PDF export)
+│   └── search_service.py             ✅ ENHANCE (query expansion)
+├── routers/
+│   └── deep_research.py              ⭐ NEW (endpoints)
+└── requirements.txt                  ✅ UPDATE (add reportlab)
+
+src/
+├── components/
+│   ├── DeepResearch/
+│   │   ├── DeepResearchPanel.tsx    ⭐ NEW (main UI)
+│   │   ├── ResearchProgress.tsx     ⭐ NEW (progress UI)
+│   │   ├── ResearchResultsView.tsx  ⭐ NEW (results display)
+│   │   ├── FindingCard.tsx          ⭐ NEW (sub-component)
+│   │   ├── SourceCard.tsx           ⭐ NEW (sub-component)
+│   │   └── ExportMenu.tsx           ⭐ NEW (export options)
+│   └── ChatInterface.tsx            ✅ MODIFY (add deep research)
+├── store/
+│   └── researchStore.ts             ⭐ NEW (state management)
+├── api/
+│   └── deepResearch.ts              ⭐ NEW (API calls)
+└── types/
+    └── index.ts                     ✅ UPDATE (add research types)
+```
+
+---
+
+## Next Steps
+
+1. **Review this plan** and confirm approach
+2. **Start with backend** (Week 1 tasks)
+3. **Test iteratively** with real queries
+4. **Build frontend** once backend is stable
+5. **Polish and optimize** in final week
+
+This upgraded Deep Research system will transform your PLUGIN into a true research assistant, capable of complex multi-hop reasoning and professional report generation. 🚀
+
+---
+
+**Questions to Address Before Starting**:
+
+1. Should we use ReportLab or WeasyPrint for PDF? (ReportLab = more control, WeasyPrint = easier CSS styling)
+2. Do you want academic search (Google Scholar API)? Costs $$$
+3. Maximum research time limit? (suggest: 5 minutes with user option to extend)
+4. Should research results be saved to database or just returned?
+5. User authentication needed for export features?

@@ -1,40 +1,45 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import type { AppSettings, LLMBackend, ModelConfig, ToolsConfig } from '../types'
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type {
+  AppSettings,
+  LLMBackend,
+  ModelConfig,
+  ToolsConfig,
+} from "../types";
 
 interface SettingsStore {
-  settings: AppSettings
-  updateBackend: (backend: LLMBackend) => void
-  setActiveBackend: (backendId: string) => void
-  setActiveModel: (model: string) => void
-  updateModelConfig: (config: Partial<ModelConfig>) => void
-  updateToolsConfig: (config: Partial<ToolsConfig>) => void
-  setConversationMode: (mode: string) => void
-  addBackend: (backend: LLMBackend) => void
-  removeBackend: (backendId: string) => void
+  settings: AppSettings;
+  updateBackend: (backend: LLMBackend) => void;
+  setActiveBackend: (backendId: string) => void;
+  setActiveModel: (model: string) => void;
+  updateModelConfig: (config: Partial<ModelConfig>) => void;
+  updateToolsConfig: (config: Partial<ToolsConfig>) => void;
+  setConversationMode: (mode: string) => void;
+  addBackend: (backend: LLMBackend) => void;
+  removeBackend: (backendId: string) => void;
 }
 
 const defaultSettings: AppSettings = {
   backends: [
     {
-      id: 'ollama-default',
-      name: 'Ollama',
-      type: 'ollama',
-      url: 'http://localhost:11434',
+      id: "ollama-default",
+      name: "Ollama",
+      type: "ollama",
+      url: "http://localhost:11434",
       models: [],
       isActive: true,
     },
     {
-      id: 'lmstudio-default',
-      name: 'LM Studio',
-      type: 'lmstudio',
-      url: 'http://localhost:1234',
+      id: "lmstudio-default",
+      name: "LM Studio",
+      type: "lmstudio",
+      url: "http://localhost:1234",
       models: [],
       isActive: false,
     },
   ],
-  activeBackend: 'ollama-default',
-  activeModel: '',
+  activeBackend: "ollama-default",
+  activeModel: "",
   modelConfig: {
     temperature: 0.7,
     topP: 0.9,
@@ -45,18 +50,18 @@ const defaultSettings: AppSettings = {
   toolsConfig: {
     webSearch: true,
     rag: true,
-    deepResearch: false,
+    deepResearch: true,
     fileUpload: true,
   },
-  conversationMode: 'standard',
-  theme: 'dark',
-}
+  conversationMode: "standard",
+  theme: "dark",
+};
 
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
       settings: defaultSettings,
-      
+
       updateBackend: (backend) =>
         set((state) => ({
           settings: {
@@ -130,7 +135,7 @@ export const useSettingsStore = create<SettingsStore>()(
         })),
     }),
     {
-      name: 'llm-chat-settings',
+      name: "llm-chat-settings",
     }
   )
-)
+);
