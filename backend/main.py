@@ -32,9 +32,28 @@ logging.getLogger("watchfiles.main").setLevel(logging.WARNING)
 # Load environment variables
 load_dotenv()
 
-from routers import chat, files, models, tools, health, deep_research
+from routers import chat, files, models, tools, health, deep_research, sessions
+from services.database_service import db_service
 
 app = FastAPI(title="Local LLM Chat API", version="1.0.0")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    try:
+        await db_service.connect()
+        logger.info("Application startup complete")
+    except Exception as e:
+        logger.error(f"Startup failed: {e}")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    await db_service.disconnect()
+    logger.info("Application shutdown complete")
+
 
 # CORS Configuration
 app.add_middleware(
@@ -59,6 +78,7 @@ app.include_router(tools.router, prefix="/api/tools", tags=["tools"])
 app.include_router(
     deep_research.router, prefix="/api/deep-research", tags=["deep-research"]
 )
+app.include_router(sessions.router, prefix="/api/sessions", tags=["sessions"])
 
 
 @app.get("/")

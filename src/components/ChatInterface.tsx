@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { Send, Paperclip, BarChart3 } from "lucide-react";
 import { useChatStore } from "../store/chatStore";
+import { useSessionStore } from "../store/sessionStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useFileStore } from "../store/fileStore";
 import MessageList from "./MessageList.tsx";
-import { sendMessage } from "../api/chat";
-import { uploadFile } from "../api/files";
-import { webSearch, ragQuery } from "../api/tools";
-import type { RAGResult, SearchResult } from "../types";
+import FileCard from "./FileCard";
+import { sessionApi } from "../api/sessions";
 
 interface ChatInterfaceProps {
   onToggleRightSidebar: () => void;
@@ -18,25 +18,80 @@ export default function ChatInterface({
   onToggleRightSidebar,
   isRightSidebarOpen,
 }: ChatInterfaceProps) {
+  const { sessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
   const {
     messages,
     addMessage,
+    clearMessages,
     setStreaming,
     updateStats,
     setCurrentContext,
     setCurrentSearchResults,
   } = useChatStore();
+
+  const { loadSession, createSession, setCurrentSessionId } = useSessionStore();
+
   const { settings } = useSettingsStore();
-  const { files, addFile, selectedFiles } = useFileStore();
+  const { addFile } = useFileStore();
+
+  const [sessionFiles, setSessionFiles] = useState<any[]>([]);
+
+  // Load session on mount or when sessionId changes
+  useEffect(() => {
+    const initSession = async () => {
+      if (sessionId === "new") {
+        // Create new session
+        try {
+          const newSessionId = await createSession(
+            settings.activeBackend,
+            settings.activeModel,
+            settings.modelConfig
+          );
+          navigate(`/chat/${newSessionId}`, { replace: true });
+        } catch (error) {
+          console.error("Failed to create session:", error);
+        }
+      } else if (sessionId) {
+        // Load existing session
+        try {
+          await loadSession(sessionId);
+          setCurrentSessionId(sessionId);
+          // Load messages into chat store
+          const session = await sessionApi.getSession(sessionId);
+          clearMessages();
+          session.messages.forEach((msg: any) => {
+            addMessage({
+              id: msg.message_id,
+              role: msg.role,
+              content: msg.content,
+              timestamp: new Date(msg.timestamp),
+              tokens: msg.tokens,
+              latency: msg.latency,
+              citations: msg.citations,
+              retrievedContext: msg.retrieved_context,
+            });
+          });
+          // Load session files
+          setSessionFiles(session.files || []);
+        } catch (error) {
+          console.error("Failed to load session:", error);
+        }
+      }
+    };
+
+    initSession();
+  }, [sessionId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !sessionId || sessionId === "new") return;
 
     const userMessage = {
       id: crypto.randomUUID(),
@@ -53,85 +108,21 @@ export default function ChatInterface({
 
     try {
       const startTime = Date.now();
-      let contextText = "";
-      let ragResults: RAGResult[] = [];
-      let searchResults: SearchResult[] = [];
 
-      // Perform RAG query if enabled and files are available
-      if (settings.toolsConfig.rag && files.length > 0) {
-        setLoadingStatus("🔍 Searching knowledge base...");
-        const fileIds =
-          selectedFiles.length > 0 ? selectedFiles : files.map((f) => f.id);
-        ragResults = await ragQuery(userQuery, fileIds, 3);
-        setCurrentContext(ragResults);
-
-        if (ragResults.length > 0) {
-          contextText += "\n\n--- Retrieved Context ---\n";
-          ragResults.forEach((result, idx) => {
-            contextText += `[${idx + 1}] From ${result.source}:\n${
-              result.content
-            }\n\n`;
-          });
-        }
-      }
-
-      // Perform web search if enabled
-      if (settings.toolsConfig.webSearch) {
-        setLoadingStatus("🌐 Searching the web...");
-        searchResults = await webSearch(userQuery, 5);
-        setCurrentSearchResults(searchResults);
-
-        if (searchResults.length > 0) {
-          contextText += "\n\n--- Web Search Results ---\n";
-          contextText += `Found ${searchResults.length} relevant sources:\n\n`;
-          searchResults.forEach((result, idx) => {
-            contextText += `Source [${idx + 1}]: ${result.title}\n`;
-            contextText += `URL: ${result.url}\n`;
-            if (result.content && result.content.length > 100) {
-              // Use full scraped content if available
-              contextText += `Content: ${result.content}\n\n`;
-            } else {
-              // Fallback to snippet
-              contextText += `Summary: ${result.snippet}\n\n`;
-            }
-          });
-        }
-      }
-
-      // Combine context with user query
+      // Use session API to send message (backend handles RAG and web search)
       setLoadingStatus("🤖 Generating response...");
-      const enhancedPrompt = contextText
-        ? `You are a helpful AI assistant. Use the following context to answer the user's question accurately.
 
-${contextText}
---- User Question ---
-${userQuery}
-
-IMPORTANT:
-- Answer based on the context provided above
-- Cite sources using [1], [2], etc. when referencing information
-- If the context doesn't contain enough information, say so clearly
-- Be specific and factual
-- Include relevant details from the sources`
-        : userQuery;
-
-      // Build conversation history (last 10 messages)
-      const history = messages.slice(-10).map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-
-      const response = await sendMessage(
-        enhancedPrompt,
-        settings.activeBackend,
-        settings.activeModel,
-        settings.modelConfig,
-        history
-      );
+      const response = await sessionApi.sendMessage(sessionId, {
+        message: userQuery,
+        tools_enabled: {
+          web_search: settings.toolsConfig.webSearch,
+          rag: settings.toolsConfig.rag && sessionFiles.length > 0,
+        },
+      });
 
       const latency = Date.now() - startTime;
       const assistantMessage = {
-        id: crypto.randomUUID(),
+        id: response.assistant_message_id,
         role: "assistant" as const,
         content: response.content,
         timestamp: new Date(),
@@ -139,18 +130,26 @@ IMPORTANT:
         latency,
         model: response.model,
         backend: response.backend,
-        retrievedContext: ragResults.length > 0 ? ragResults : undefined,
-        citations:
-          searchResults.length > 0
-            ? searchResults.map((r) => ({
-                text: r.snippet,
-                url: r.url,
-                title: r.title,
-              }))
-            : undefined,
+        retrievedContext: response.retrieved_context || undefined,
+        citations: response.citations || undefined,
       };
 
       addMessage(assistantMessage);
+
+      // Update context and search results in store for display
+      if (response.retrieved_context) {
+        setCurrentContext(response.retrieved_context);
+      }
+      if (response.citations) {
+        setCurrentSearchResults(
+          response.citations.map((c: any) => ({
+            title: c.title,
+            url: c.url,
+            snippet: c.text,
+          }))
+        );
+      }
+
       if (response.tokens) {
         updateStats(response.tokens.total, latency);
       }
@@ -188,16 +187,24 @@ IMPORTANT:
     }
 
     try {
-      const result = await uploadFile(file);
+      // Upload to session
+      const result = await sessionApi.uploadFile(sessionId!, file);
+
+      // Add to local file store for UI
       addFile({
-        id: result.fileId,
-        name: result.name,
+        id: result.file_id || result.fileId,
+        name: result.filename || result.name,
         type: file.type,
         size: result.size,
         uploadedAt: new Date(Date.now()),
-        processed: result.processed,
+        processed: result.embedded || result.processed,
         chunks: result.chunks,
       });
+
+      // Refresh session to get updated files list
+      const session = await sessionApi.getSession(sessionId!);
+      setSessionFiles(session.files || []);
+
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -240,6 +247,29 @@ IMPORTANT:
 
       {/* Messages */}
       <MessageList messages={messages} isLoading={isLoading} />
+
+      {/* Session Files Display */}
+      {sessionFiles.length > 0 && (
+        <div className="px-8 pb-4">
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase">
+              Knowledge Base ({sessionFiles.length})
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {sessionFiles.map((file) => (
+                <FileCard
+                  key={file.file_id}
+                  filename={file.filename}
+                  size={file.size}
+                  type={file.type}
+                  chunks={file.chunks}
+                  compact={true}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Loading Status Indicator */}
       {loadingStatus && (

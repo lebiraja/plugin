@@ -13,12 +13,17 @@ class LLMService:
         }
 
     async def generate_response(
-        self, message: str, backend: str, model: str, config: Dict[str, Any], history: list = None
+        self,
+        message: str,
+        backend: str,
+        model: str,
+        config: Dict[str, Any],
+        history: list = None,
     ) -> Dict[str, Any]:
         """Generate a response from the specified backend"""
         if history is None:
             history = []
-        
+
         if backend == "ollama-default":
             return await self._ollama_generate(message, model, config, history)
         elif backend == "lmstudio-default":
@@ -30,7 +35,7 @@ class LLMService:
         self, message: str, backend: str, model: str, config: Dict[str, Any]
     ) -> AsyncGenerator[str, None]:
         """Stream a response from the specified backend"""
-        
+
         if backend == "ollama-default":
             async for chunk in self._ollama_stream(message, model, config):
                 yield chunk
@@ -43,20 +48,20 @@ class LLMService:
     ) -> Dict[str, Any]:
         """Generate response using Ollama"""
         url = f"{self.backend_urls['ollama-default']}/api/generate"
-        
+
         # Build context from history
         prompt = message
         if history:
             context_messages = []
             for msg in history[-10:]:
-                role = msg.get('role', 'user')
-                content = msg.get('content', '')
-                prefix = "User: " if role == 'user' else "Assistant: "
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                prefix = "User: " if role == "user" else "Assistant: "
                 context_messages.append(f"{prefix}{content}")
-            
+
             context = "\n".join(context_messages)
             prompt = f"{context}\nUser: {message}\nAssistant:"
-        
+
         payload = {
             "model": model,
             "prompt": prompt,
@@ -68,37 +73,52 @@ class LLMService:
             },
         }
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(url, json=payload)
 
-        return {
-            "content": data.get("response", ""),
-            "model": model,
-            "backend": "ollama",
-            "tokens": {
-                "prompt": data.get("prompt_eval_count", 0),
-                "completion": data.get("eval_count", 0),
-                "total": data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
-            },
-        }
+                # Log error details if request fails
+                if response.status_code != 200:
+                    error_text = response.text
+                    raise Exception(
+                        f"Ollama API error ({response.status_code}): {error_text}"
+                    )
+
+                data = response.json()
+
+            return {
+                "content": data.get("response", ""),
+                "model": model,
+                "backend": "ollama",
+                "tokens": {
+                    "prompt": data.get("prompt_eval_count", 0),
+                    "completion": data.get("eval_count", 0),
+                    "total": data.get("prompt_eval_count", 0)
+                    + data.get("eval_count", 0),
+                },
+            }
+        except httpx.HTTPStatusError as e:
+            raise Exception(
+                f"Ollama HTTP error: {e.response.status_code} - {e.response.text}"
+            )
+        except Exception as e:
+            raise Exception(f"Ollama generation failed: {str(e)}")
 
     async def _lmstudio_generate(
         self, message: str, model: str, config: Dict[str, Any], history: list = None
     ) -> Dict[str, Any]:
         """Generate response using LM Studio"""
         url = f"{self.backend_urls['lmstudio-default']}/v1/chat/completions"
-        
+
         # Build messages from history
         messages = []
         if history:
             # Include last 10 messages for context
             messages = history[-10:]
-        
+
         # Add current message
         messages.append({"role": "user", "content": message})
-        
+
         payload = {
             "model": model,
             "messages": messages,
@@ -131,7 +151,7 @@ class LLMService:
     ) -> AsyncGenerator[str, None]:
         """Stream response from Ollama"""
         url = f"{self.backend_urls['ollama-default']}/api/generate"
-        
+
         payload = {
             "model": model,
             "prompt": message,
@@ -144,7 +164,7 @@ class LLMService:
         }
 
         async with httpx.AsyncClient(timeout=120.0) as client:
-            async with client.stream('POST', url, json=payload) as response:
+            async with client.stream("POST", url, json=payload) as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
                     if line:
@@ -157,7 +177,7 @@ class LLMService:
     ) -> AsyncGenerator[str, None]:
         """Stream response from LM Studio"""
         url = f"{self.backend_urls['lmstudio-default']}/v1/chat/completions"
-        
+
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": message}],
@@ -168,7 +188,7 @@ class LLMService:
         }
 
         async with httpx.AsyncClient(timeout=120.0) as client:
-            async with client.stream('POST', url, json=payload) as response:
+            async with client.stream("POST", url, json=payload) as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
                     if line and line.startswith("data: "):

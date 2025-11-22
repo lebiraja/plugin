@@ -25,7 +25,7 @@ transformers==4.44.2
 # torch==2.4.1  # CPU-only version - replace with GPU version below if you have NVIDIA GPU
 # For GPU support, install manually:
 # pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-torch==2.4.1  # CPU version - faster to install but slower inference
+
 huggingface-hub==0.24.6
 einops==0.8.0
 
@@ -36,3 +36,7 @@ beautifulsoup4==4.12.3
 # Utilities
 tiktoken==0.8.0
 aiofiles==24.1.0
+
+# MongoDB
+motor==3.6.0
+pymongo>=4.9,<4.10
