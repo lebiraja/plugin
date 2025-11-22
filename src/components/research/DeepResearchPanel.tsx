@@ -88,13 +88,13 @@ export const DeepResearchPanel: React.FC = () => {
   const getStageIcon = (stage: ResearchStage) => {
     switch (stage) {
       case "planning":
-        return <FileText className="w-5 h-5 text-blue-500 animate-pulse" />;
+        return <FileText className="w-5 h-5 text-gray-300 animate-pulse" />;
       case "searching":
-        return <Search className="w-5 h-5 text-purple-500 animate-pulse" />;
+        return <Search className="w-5 h-5 text-gray-300 animate-pulse" />;
       case "reasoning":
-        return <Brain className="w-5 h-5 text-indigo-500 animate-pulse" />;
+        return <Brain className="w-5 h-5 text-gray-300 animate-pulse" />;
       case "synthesizing":
-        return <Lightbulb className="w-5 h-5 text-yellow-500 animate-pulse" />;
+        return <Lightbulb className="w-5 h-5 text-gray-300 animate-pulse" />;
       case "complete":
         return <CheckCircle2 className="w-5 h-5 text-green-500" />;
       case "error":
@@ -124,10 +124,10 @@ export const DeepResearchPanel: React.FC = () => {
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-6 space-y-6">
+    <div className="bg-glass-bg backdrop-blur-sm border border-glass-border rounded-lg p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-3">
-        <Brain className="w-6 h-6 text-indigo-400" />
+        <Brain className="w-6 h-6 text-primary" />
         <h2 className="text-xl font-semibold text-white">Deep Research</h2>
       </div>
 
@@ -141,7 +141,7 @@ export const DeepResearchPanel: React.FC = () => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="What would you like to research in depth?"
-            className="w-full px-4 py-3 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+            className="w-full px-4 py-3 bg-glass-bg border border-glass-border text-white rounded-lg focus:ring-2 focus:ring-primary/50 focus:outline-none resize-none"
             rows={3}
             disabled={isResearching}
           />
@@ -156,7 +156,7 @@ export const DeepResearchPanel: React.FC = () => {
             <select
               value={maxDepth}
               onChange={(e) => setMaxDepth(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-glass-bg border border-glass-border text-white rounded-lg focus:ring-2 focus:ring-primary/50 focus:outline-none"
               disabled={isResearching}
             >
               <option value={1}>Basic (1 level)</option>
@@ -172,7 +172,7 @@ export const DeepResearchPanel: React.FC = () => {
             <select
               value={maxSources}
               onChange={(e) => setMaxSources(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-glass-bg border border-glass-border text-white rounded-lg focus:ring-2 focus:ring-primary/50 focus:outline-none"
               disabled={isResearching}
             >
               <option value={5}>Quick (5 sources)</option>
@@ -187,7 +187,7 @@ export const DeepResearchPanel: React.FC = () => {
         <button
           onClick={handleResearch}
           disabled={isResearching || !query.trim()}
-          className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+          className="w-full py-3 bg-primary hover:bg-primary/80 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
         >
           {isResearching ? (
             <>
@@ -217,14 +217,14 @@ export const DeepResearchPanel: React.FC = () => {
               </div>
               <span className="text-gray-400">{progress.progress}%</span>
             </div>
-            <div className="w-full bg-gray-700 rounded-full h-2">
+            <div className="w-full bg-glass-bg border border-glass-border rounded-full h-2">
               <div
                 className={`h-2 rounded-full transition-all duration-500 ${
                   progress.stage === "error"
                     ? "bg-red-500"
                     : progress.stage === "complete"
                     ? "bg-green-500"
-                    : "bg-indigo-500"
+                    : "bg-primary"
                 }`}
                 style={{ width: `${progress.progress}%` }}
               />
@@ -241,7 +241,7 @@ export const DeepResearchPanel: React.FC = () => {
                 key={stage}
                 className={`p-2 rounded-lg text-center text-xs ${
                   progress.stage === stage
-                    ? "bg-indigo-600 text-white"
+                    ? "bg-primary text-white"
                     : [
                         "planning",
                         "searching",
@@ -254,8 +254,8 @@ export const DeepResearchPanel: React.FC = () => {
                         "reasoning",
                         "synthesizing",
                       ].indexOf(stage)
-                    ? "bg-green-900 text-green-300"
-                    : "bg-gray-700 text-gray-400"
+                    ? "bg-green-900/50 text-green-400"
+                    : "bg-glass-bg border border-glass-border text-gray-400"
                 }`}
               >
                 {getStageLabel(stage)}
@@ -267,7 +267,7 @@ export const DeepResearchPanel: React.FC = () => {
 
       {/* Error Display */}
       {error && (
-        <div className="p-4 bg-red-900/30 border border-red-500 rounded-lg flex items-start space-x-3">
+        <div className="p-4 bg-red-900/20 border border-red-500/50 rounded-lg flex items-start space-x-3">
           <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
           <div>
             <h4 className="font-medium text-red-400">Research Failed</h4>
@@ -280,13 +280,13 @@ export const DeepResearchPanel: React.FC = () => {
       {currentResearch && (
         <div className="grid grid-cols-3 gap-3 pt-4 border-t border-gray-700">
           <div className="text-center">
-            <div className="text-2xl font-bold text-indigo-400">
+            <div className="text-2xl font-bold text-primary">
               {currentResearch.evidence_count}
             </div>
             <div className="text-xs text-gray-400">Sources</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-purple-400">
+            <div className="text-2xl font-bold text-primary">
               {currentResearch.reasoning_trace.length}
             </div>
             <div className="text-xs text-gray-400">Insights</div>

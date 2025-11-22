@@ -32,7 +32,7 @@ export const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
               onClick={() => setActiveMode("chat")}
               className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2 ${
                 activeMode === "chat"
-                  ? "bg-indigo-600 text-white"
+                  ? "bg-primary text-white"
                   : "bg-gray-700 text-gray-300 hover:bg-gray-650"
               }`}
             >
@@ -43,7 +43,7 @@ export const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
               onClick={() => setActiveMode("research")}
               className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2 ${
                 activeMode === "research"
-                  ? "bg-indigo-600 text-white"
+                  ? "bg-primary text-white"
                   : "bg-gray-700 text-gray-300 hover:bg-gray-650"
               }`}
             >

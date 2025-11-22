@@ -13,6 +13,7 @@ import {
   Download,
 } from "lucide-react";
 import { ResearchResult } from "../../types";
+import { MarkdownRenderer } from "../common/MarkdownRenderer";
 
 interface ResearchResultsViewProps {
   research: ResearchResult;
@@ -50,7 +51,7 @@ export const ResearchResultsView: React.FC<ResearchResultsViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-900 to-purple-900 rounded-lg p-6">
+      <div className="bg-glass-bg backdrop-blur-sm border border-glass-border rounded-lg p-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-white mb-2">
@@ -75,7 +76,7 @@ export const ResearchResultsView: React.FC<ResearchResultsViewProps> = ({
 
         {/* Metadata */}
         <div className="grid grid-cols-5 gap-4 mt-6">
-          <div className="bg-white/10 rounded-lg p-3 text-center">
+          <div className="bg-glass-bg border border-glass-border rounded-lg p-3 text-center">
             <div className="text-2xl font-bold text-white">
               {research.evidence_count}
             </div>
@@ -97,9 +98,9 @@ export const ResearchResultsView: React.FC<ResearchResultsViewProps> = ({
             <div className="text-2xl font-bold text-white">
               {research.metadata.time_taken.toFixed(1)}s
             </div>
-            <div className="text-xs text-gray-300">Duration</div>
+            <div className="text-xs text-gray-400">Duration</div>
           </div>
-          <div className="bg-white/10 rounded-lg p-3 text-center">
+          <div className="bg-glass-bg border border-glass-border rounded-lg p-3 text-center">
             <div className="text-2xl font-bold text-white">
               {research.metadata.llm_calls}
             </div>
@@ -112,10 +113,10 @@ export const ResearchResultsView: React.FC<ResearchResultsViewProps> = ({
       <div className="bg-gray-800 rounded-lg overflow-hidden">
         <button
           onClick={() => toggleSection("summary")}
-          className="w-full p-4 flex items-center justify-between hover:bg-gray-750 transition-colors"
+          className="w-full p-4 flex items-center justify-between hover:bg-glass-hover transition-colors"
         >
           <div className="flex items-center space-x-3">
-            <FileText className="w-5 h-5 text-indigo-400" />
+            <FileText className="w-5 h-5 text-primary" />
             <h3 className="text-lg font-semibold text-white">
               Executive Summary
             </h3>
@@ -128,9 +129,10 @@ export const ResearchResultsView: React.FC<ResearchResultsViewProps> = ({
         </button>
         {expandedSections.has("summary") && (
           <div className="p-4 border-t border-gray-700">
-            <p className="text-gray-300 leading-relaxed">
-              {research.final_report.executive_summary}
-            </p>
+            <MarkdownRenderer
+              content={research.final_report.executive_summary}
+              className="text-gray-300"
+            />
           </div>
         )}
       </div>
@@ -140,10 +142,10 @@ export const ResearchResultsView: React.FC<ResearchResultsViewProps> = ({
         <div className="bg-gray-800 rounded-lg overflow-hidden">
           <button
             onClick={() => toggleSection("insights")}
-            className="w-full p-4 flex items-center justify-between hover:bg-gray-750 transition-colors"
+            className="w-full p-4 flex items-center justify-between hover:bg-glass-hover transition-colors"
           >
             <div className="flex items-center space-x-3">
-              <Lightbulb className="w-5 h-5 text-yellow-400" />
+              <Lightbulb className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold text-white">
                 Key Insights ({research.final_report.insights.length})
               </h3>
@@ -172,10 +174,10 @@ export const ResearchResultsView: React.FC<ResearchResultsViewProps> = ({
         <div className="bg-gray-800 rounded-lg overflow-hidden">
           <button
             onClick={() => toggleSection("recommendations")}
-            className="w-full p-4 flex items-center justify-between hover:bg-gray-750 transition-colors"
+            className="w-full p-4 flex items-center justify-between hover:bg-glass-hover transition-colors"
           >
             <div className="flex items-center space-x-3">
-              <TrendingUp className="w-5 h-5 text-blue-400" />
+              <TrendingUp className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold text-white">
                 Recommendations ({research.final_report.recommendations.length})
               </h3>
@@ -190,8 +192,8 @@ export const ResearchResultsView: React.FC<ResearchResultsViewProps> = ({
             <div className="p-4 border-t border-gray-700 space-y-3">
               {research.final_report.recommendations.map((rec, idx) => (
                 <div key={idx} className="flex items-start space-x-3">
-                  <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-bold text-blue-400">
+                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-bold text-primary">
                       {idx + 1}
                     </span>
                   </div>
@@ -207,10 +209,10 @@ export const ResearchResultsView: React.FC<ResearchResultsViewProps> = ({
       <div className="bg-gray-800 rounded-lg overflow-hidden">
         <button
           onClick={() => toggleSection("reasoning")}
-          className="w-full p-4 flex items-center justify-between hover:bg-gray-750 transition-colors"
+          className="w-full p-4 flex items-center justify-between hover:bg-glass-hover transition-colors"
         >
           <div className="flex items-center space-x-3">
-            <Brain className="w-5 h-5 text-purple-400" />
+            <Brain className="w-5 h-5 text-primary" />
             <h3 className="text-lg font-semibold text-white">
               Reasoning Trace ({research.reasoning_trace.length} steps)
             </h3>
@@ -282,10 +284,10 @@ export const ResearchResultsView: React.FC<ResearchResultsViewProps> = ({
       <div className="bg-gray-800 rounded-lg overflow-hidden">
         <button
           onClick={() => toggleSection("evidence")}
-          className="w-full p-4 flex items-center justify-between hover:bg-gray-750 transition-colors"
+          className="w-full p-4 flex items-center justify-between hover:bg-glass-hover transition-colors"
         >
           <div className="flex items-center space-x-3">
-            <FileText className="w-5 h-5 text-green-400" />
+            <FileText className="w-5 h-5 text-primary" />
             <h3 className="text-lg font-semibold text-white">
               Top Evidence Sources ({research.top_evidence.length})
             </h3>
@@ -308,7 +310,7 @@ export const ResearchResultsView: React.FC<ResearchResultsViewProps> = ({
                     href={evidence.source_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-indigo-400 hover:text-indigo-300 ml-2"
+                    className="text-primary hover:text-primary/80 ml-2"
                   >
                     <ExternalLink className="w-4 h-4" />
                   </a>
@@ -363,7 +365,7 @@ export const ResearchResultsView: React.FC<ResearchResultsViewProps> = ({
                     href={citation.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-indigo-400 hover:text-indigo-300 text-xs break-all"
+                    className="text-primary hover:text-primary/80 text-xs break-all"
                   >
                     {citation.url}
                   </a>
@@ -382,7 +384,7 @@ export const ResearchResultsView: React.FC<ResearchResultsViewProps> = ({
         <div className="bg-gray-800 rounded-lg overflow-hidden">
           <button
             onClick={() => toggleSection("caveats")}
-            className="w-full p-4 flex items-center justify-between hover:bg-gray-750 transition-colors"
+            className="w-full p-4 flex items-center justify-between hover:bg-glass-hover transition-colors"
           >
             <div className="flex items-center space-x-3">
               <AlertTriangle className="w-5 h-5 text-orange-400" />
