@@ -1,92 +1,125 @@
-import { useState, useRef, useEffect } from 'react'
-import { Send, Paperclip, BarChart3 } from 'lucide-react'
-import { useChatStore } from '../store/chatStore'
-import { useSettingsStore } from '../store/settingsStore'
-import { useFileStore } from '../store/fileStore'
-import MessageList from './MessageList.tsx'
-import { sendMessage } from '../api/chat'
-import { uploadFile } from '../api/files'
-import { webSearch, ragQuery } from '../api/tools'
-import type { RAGResult, SearchResult } from '../types'
+import { useState, useRef, useEffect } from "react";
+import { Send, Paperclip, BarChart3 } from "lucide-react";
+import { useChatStore } from "../store/chatStore";
+import { useSettingsStore } from "../store/settingsStore";
+import { useFileStore } from "../store/fileStore";
+import MessageList from "./MessageList.tsx";
+import { sendMessage } from "../api/chat";
+import { uploadFile } from "../api/files";
+import { webSearch, ragQuery } from "../api/tools";
+import type { RAGResult, SearchResult } from "../types";
 
 interface ChatInterfaceProps {
-  onToggleRightSidebar: () => void
-  isRightSidebarOpen: boolean
+  onToggleRightSidebar: () => void;
+  isRightSidebarOpen: boolean;
 }
 
-export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen }: ChatInterfaceProps) {
-  const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [loadingStatus, setLoadingStatus] = useState('')
-  const inputRef = useRef<HTMLTextAreaElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const { messages, addMessage, setStreaming, updateStats, setCurrentContext, setCurrentSearchResults } = useChatStore()
-  const { settings } = useSettingsStore()
-  const { files, addFile, selectedFiles } = useFileStore()
+export default function ChatInterface({
+  onToggleRightSidebar,
+  isRightSidebarOpen,
+}: ChatInterfaceProps) {
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    messages,
+    addMessage,
+    setStreaming,
+    updateStats,
+    setCurrentContext,
+    setCurrentSearchResults,
+  } = useChatStore();
+  const { settings } = useSettingsStore();
+  const { files, addFile, selectedFiles } = useFileStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim() || isLoading) return
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
 
     const userMessage = {
       id: crypto.randomUUID(),
-      role: 'user' as const,
+      role: "user" as const,
       content: input.trim(),
       timestamp: new Date(),
-    }
+    };
 
-    addMessage(userMessage)
-    const userQuery = input.trim()
-    setInput('')
-    setIsLoading(true)
-    setStreaming(true)
+    addMessage(userMessage);
+    const userQuery = input.trim();
+    setInput("");
+    setIsLoading(true);
+    setStreaming(true);
 
     try {
-      const startTime = Date.now()
-      let contextText = ''
-      let ragResults: RAGResult[] = []
-      let searchResults: SearchResult[] = []
+      const startTime = Date.now();
+      let contextText = "";
+      let ragResults: RAGResult[] = [];
+      let searchResults: SearchResult[] = [];
 
       // Perform RAG query if enabled and files are available
       if (settings.toolsConfig.rag && files.length > 0) {
-        setLoadingStatus('🔍 Searching knowledge base...')
-        const fileIds = selectedFiles.length > 0 ? selectedFiles : files.map(f => f.id)
-        ragResults = await ragQuery(userQuery, fileIds, 3)
-        setCurrentContext(ragResults)
-        
+        setLoadingStatus("🔍 Searching knowledge base...");
+        const fileIds =
+          selectedFiles.length > 0 ? selectedFiles : files.map((f) => f.id);
+        ragResults = await ragQuery(userQuery, fileIds, 3);
+        setCurrentContext(ragResults);
+
         if (ragResults.length > 0) {
-          contextText += '\n\n--- Retrieved Context ---\n'
+          contextText += "\n\n--- Retrieved Context ---\n";
           ragResults.forEach((result, idx) => {
-            contextText += `[${idx + 1}] From ${result.source}:\n${result.content}\n\n`
-          })
+            contextText += `[${idx + 1}] From ${result.source}:\n${
+              result.content
+            }\n\n`;
+          });
         }
       }
 
       // Perform web search if enabled
       if (settings.toolsConfig.webSearch) {
-        setLoadingStatus('🌐 Searching the web...')
-        searchResults = await webSearch(userQuery, 3)
-        setCurrentSearchResults(searchResults)
-        
+        setLoadingStatus("🌐 Searching the web...");
+        searchResults = await webSearch(userQuery, 5);
+        setCurrentSearchResults(searchResults);
+
         if (searchResults.length > 0) {
-          contextText += '\n\n--- Web Search Results ---\n'
+          contextText += "\n\n--- Web Search Results ---\n";
+          contextText += `Found ${searchResults.length} relevant sources:\n\n`;
           searchResults.forEach((result, idx) => {
-            contextText += `[${idx + 1}] ${result.title}\n${result.snippet}\nSource: ${result.url}\n\n`
-          })
+            contextText += `Source [${idx + 1}]: ${result.title}\n`;
+            contextText += `URL: ${result.url}\n`;
+            if (result.content && result.content.length > 100) {
+              // Use full scraped content if available
+              contextText += `Content: ${result.content}\n\n`;
+            } else {
+              // Fallback to snippet
+              contextText += `Summary: ${result.snippet}\n\n`;
+            }
+          });
         }
       }
 
       // Combine context with user query
-      setLoadingStatus('🤖 Generating response...')
-      const enhancedPrompt = contextText 
-        ? `${contextText}\n--- User Question ---\n${userQuery}\n\nPlease answer the question using the context provided above.`
-        : userQuery
+      setLoadingStatus("🤖 Generating response...");
+      const enhancedPrompt = contextText
+        ? `You are a helpful AI assistant. Use the following context to answer the user's question accurately.
+
+${contextText}
+--- User Question ---
+${userQuery}
+
+IMPORTANT:
+- Answer based on the context provided above
+- Cite sources using [1], [2], etc. when referencing information
+- If the context doesn't contain enough information, say so clearly
+- Be specific and factual
+- Include relevant details from the sources`
+        : userQuery;
 
       // Build conversation history (last 10 messages)
-      const history = messages.slice(-10).map(msg => ({
+      const history = messages.slice(-10).map((msg) => ({
         role: msg.role,
-        content: msg.content
-      }))
+        content: msg.content,
+      }));
 
       const response = await sendMessage(
         enhancedPrompt,
@@ -94,12 +127,12 @@ export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen
         settings.activeModel,
         settings.modelConfig,
         history
-      )
+      );
 
-      const latency = Date.now() - startTime
+      const latency = Date.now() - startTime;
       const assistantMessage = {
         id: crypto.randomUUID(),
-        role: 'assistant' as const,
+        role: "assistant" as const,
         content: response.content,
         timestamp: new Date(),
         tokens: response.tokens,
@@ -107,50 +140,55 @@ export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen
         model: response.model,
         backend: response.backend,
         retrievedContext: ragResults.length > 0 ? ragResults : undefined,
-        citations: searchResults.length > 0 
-          ? searchResults.map(r => ({ text: r.snippet, url: r.url, title: r.title }))
-          : undefined,
-      }
+        citations:
+          searchResults.length > 0
+            ? searchResults.map((r) => ({
+                text: r.snippet,
+                url: r.url,
+                title: r.title,
+              }))
+            : undefined,
+      };
 
-      addMessage(assistantMessage)
+      addMessage(assistantMessage);
       if (response.tokens) {
-        updateStats(response.tokens.total, latency)
+        updateStats(response.tokens.total, latency);
       }
     } catch (error) {
-      console.error('Error sending message:', error)
+      console.error("Error sending message:", error);
       addMessage({
         id: crypto.randomUUID(),
-        role: 'assistant' as const,
-        content: 'Sorry, there was an error processing your request.',
+        role: "assistant" as const,
+        content: "Sorry, there was an error processing your request.",
         timestamp: new Date(),
-      })
+      });
     } finally {
-      setIsLoading(false)
-      setStreaming(false)
-      setLoadingStatus('')
+      setIsLoading(false);
+      setStreaming(false);
+      setLoadingStatus("");
     }
-  }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmit(e)
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
     }
-  }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0];
+    if (!file) return;
 
     // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      alert('File size must be less than 10MB')
-      return
+      alert("File size must be less than 10MB");
+      return;
     }
 
     try {
-      const result = await uploadFile(file)
+      const result = await uploadFile(file);
       addFile({
         id: result.fileId,
         name: result.name,
@@ -159,23 +197,23 @@ export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen
         uploadedAt: new Date(Date.now()),
         processed: result.processed,
         chunks: result.chunks,
-      })
+      });
       // Reset file input
       if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+        fileInputRef.current.value = "";
       }
     } catch (error) {
-      console.error('Error uploading file:', error)
-      alert(error instanceof Error ? error.message : 'Failed to upload file')
+      console.error("Error uploading file:", error);
+      alert(error instanceof Error ? error.message : "Failed to upload file");
     }
-  }
+  };
 
   useEffect(() => {
     if (inputRef.current) {
-      inputRef.current.style.height = 'auto'
-      inputRef.current.style.height = `${inputRef.current.scrollHeight}px`
+      inputRef.current.style.height = "auto";
+      inputRef.current.style.height = `${inputRef.current.scrollHeight}px`;
     }
-  }, [input])
+  }, [input]);
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -184,13 +222,15 @@ export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen
         <div>
           <h1 className="text-xl font-semibold">Chat</h1>
           <p className="text-sm text-gray-400">
-            {settings.activeModel || 'Select a model to start'}
+            {settings.activeModel || "Select a model to start"}
           </p>
         </div>
         <button
           onClick={onToggleRightSidebar}
           className={`p-2 rounded-lg transition-colors ${
-            isRightSidebarOpen ? 'bg-primary/20 text-primary' : 'hover:bg-glass-hover'
+            isRightSidebarOpen
+              ? "bg-primary/20 text-primary"
+              : "hover:bg-glass-hover"
           }`}
           aria-label="Toggle stats sidebar"
         >
@@ -248,8 +288,8 @@ export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen
             disabled={!input.trim() || isLoading}
             className={`p-2 rounded-lg transition-all self-end mb-1 ${
               input.trim() && !isLoading
-                ? 'bg-primary text-white hover:bg-primary-dark'
-                : 'bg-glass-bg text-gray-500 cursor-not-allowed'
+                ? "bg-primary text-white hover:bg-primary-dark"
+                : "bg-glass-bg text-gray-500 cursor-not-allowed"
             }`}
             aria-label="Send message"
           >
@@ -258,5 +298,5 @@ export default function ChatInterface({ onToggleRightSidebar, isRightSidebarOpen
         </form>
       </div>
     </div>
-  )
+  );
 }

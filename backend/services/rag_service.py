@@ -1,13 +1,22 @@
 from typing import List, Dict, Any
 from sentence_transformers import SentenceTransformer
 import chromadb
+import torch
 
 
 class RAGService:
     """Service for Retrieval-Augmented Generation"""
 
     def __init__(self):
-        self.embedding_model = SentenceTransformer("nomic-ai/nomic-embed-text-v1.5", trust_remote_code=True)
+        # Auto-detect device (GPU if available, otherwise CPU)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.embedding_model = SentenceTransformer(
+            "nomic-ai/nomic-embed-text-v1.5", trust_remote_code=True, device=device
+        )
+        print(f"RAG Service initialized - Using device: {device}")
+        if device == "cuda":
+            print(f"GPU: {torch.cuda.get_device_name(0)}")
+
         self.chroma_client = chromadb.PersistentClient(path="./vector_db")
         self.collection = self.chroma_client.get_or_create_collection(
             name="documents",
@@ -18,7 +27,7 @@ class RAGService:
         self, query: str, file_ids: List[str] = None, top_k: int = 3
     ) -> List[Dict[str, Any]]:
         """Query the RAG system for relevant chunks"""
-        
+
         # Generate query embedding
         query_embedding = self.embedding_model.encode(query).tolist()
 
@@ -38,12 +47,15 @@ class RAGService:
         chunks = []
         if results["documents"] and results["documents"][0]:
             for i, doc in enumerate(results["documents"][0]):
-                chunks.append({
-                    "id": results["ids"][0][i],
-                    "content": doc,
-                    "similarity": 1 - results["distances"][0][i],  # Convert distance to similarity
-                    "source": results["metadatas"][0][i].get("filename", "Unknown"),
-                    "metadata": results["metadatas"][0][i],
-                })
+                chunks.append(
+                    {
+                        "id": results["ids"][0][i],
+                        "content": doc,
+                        "similarity": 1
+                        - results["distances"][0][i],  # Convert distance to similarity
+                        "source": results["metadatas"][0][i].get("filename", "Unknown"),
+                        "metadata": results["metadatas"][0][i],
+                    }
+                )
 
         return chunks

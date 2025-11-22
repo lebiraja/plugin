@@ -13,6 +13,7 @@ rag_service = RAGService()
 class SearchRequest(BaseModel):
     query: str
     max_results: int = 5
+    scrape_content: bool = True  # Enable content scraping by default
 
 
 class RAGQueryRequest(BaseModel):
@@ -23,9 +24,11 @@ class RAGQueryRequest(BaseModel):
 
 @router.post("/search")
 async def web_search(request: SearchRequest):
-    """Perform a web search"""
+    """Perform an enhanced web search with content scraping"""
     try:
-        results = await search_service.search(request.query, request.max_results)
+        results = await search_service.search(
+            request.query, request.max_results, request.scrape_content
+        )
         return {"results": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

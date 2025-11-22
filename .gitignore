@@ -102,3 +102,5 @@ build/
 # UV package manager
 .uv/
 
+img/*.png
+

@@ -38,13 +38,13 @@ class ChatResponse(BaseModel):
     backend: Optional[str] = None
 
 
-@router.post("/", response_model=ChatResponse)
+@router.post("", response_model=ChatResponse)
 async def send_message(request: ChatRequest):
     """Send a message and get a response from the LLM"""
     try:
         # Convert history to dict format
         history_dicts = [msg.dict() for msg in request.history]
-        
+
         response = await llm_service.generate_response(
             message=request.message,
             backend=request.backend,
@@ -61,6 +61,7 @@ async def send_message(request: ChatRequest):
 async def stream_message(request: ChatRequest):
     """Stream a response from the LLM"""
     try:
+
         async def generate():
             async for chunk in llm_service.stream_response(
                 message=request.message,
