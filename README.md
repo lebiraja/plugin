@@ -13,6 +13,7 @@ A modern, feature-rich chat interface for interacting with local LLM backends li
 This is an intelligent chat application that lets you interact with powerful local AI models (like Llama, Gemma, Qwen) running on your own machine. Think ChatGPT, but **completely private, customizable, and running locally**.
 
 ### Key Capabilities:
+
 - 💬 **Persistent Chat Sessions** - ChatGPT-style interface with session management and smart auto-titles
 - 📚 **Knowledge Base (RAG)** - Upload documents (PDF, DOCX, TXT) and ask questions with MongoDB persistence
 - 🌐 **Web Search** - Get real-time information from the internet with citations
@@ -23,6 +24,7 @@ This is an intelligent chat application that lets you interact with powerful loc
 ## 🚀 Features
 
 ### 💾 Persistent Chat Sessions (NEW!)
+
 - **ChatGPT-Style Interface** - Sidebar with session history organized by time (Today, Yesterday, This Week, Older)
 - **Smart Auto-Titles** - AI generates 3-4 word titles after first exchange based on conversation context
 - **MongoDB Storage** - All conversations, messages, and files persist across sessions
@@ -30,6 +32,7 @@ This is an intelligent chat application that lets you interact with powerful loc
 - **Session-Based File Uploads** - Files are linked to specific chat sessions with metadata tracking
 
 ### 🤖 Multi-Backend LLM Support
+
 - **Ollama** - Run models like Llama, Gemma, Qwen, DeepSeek locally
 - **LM Studio** - Desktop LLM interface with OpenAI-compatible API
 - **Dynamic Model Selection** - Interactive dropdowns to switch backends and models
@@ -37,18 +40,21 @@ This is an intelligent chat application that lets you interact with powerful loc
 - **Unified Sidebar** - Backend selector, model selector, and tools all in one place
 
 ### 🧠 Advanced Conversation Memory
+
 - **Full Session History** - Remembers entire conversation within a session
 - **Intelligent Context** - Uses last 10 messages for AI context
 - **Message Persistence** - All messages stored in MongoDB with timestamps
 - **Smart Title Generation** - Asynchronous title generation using LLM after first exchange
 
 ### 🛠️ Powerful Tools (Toggle On/Off)
+
 - 🔍 **Web Search** - Powered by Serper.dev (Google search API)
 - 📚 **RAG (Document Q&A)** - Ask questions about uploaded documents with persistent storage
 - 🧪 **Deep Research** - Multi-step iterative reasoning
 - 📊 **Real-time Stats** - Token counting and latency tracking
 
 ### 📁 Enhanced Knowledge Base Management (NEW!)
+
 - **File Cards Display** - ChatGPT-style file cards showing uploaded documents in chat
 - **MongoDB Persistence** - File chunks and embeddings stored in MongoDB for permanent access
 - **Session-Specific Files** - Each session maintains its own file collection
@@ -58,6 +64,7 @@ This is an intelligent chat application that lets you interact with powerful loc
 - **Vector Search** - Semantic search across uploaded documents using embeddings
 
 ### 🎨 Modern UI/UX
+
 - ✨ **Spring Animations** - Smooth Framer Motion physics
 - 🌈 **Gradient Backgrounds** - Dynamic color schemes for messages
 - 💎 **Glassmorphism Effects** - Frosted glass aesthetics
@@ -67,6 +74,66 @@ This is an intelligent chat application that lets you interact with powerful loc
 - 🕒 **Time-Based Grouping** - Sessions organized by Today, Yesterday, This Week, Older
 
 ## 🚀 Quick Start
+
+### 🎯 Automated Setup (Recommended!)
+
+We provide **automated setup scripts** for all platforms that install everything and launch the app automatically:
+
+#### **Windows (Batch Script)**
+
+```cmd
+setup-and-run.bat
+```
+
+- Double-click `setup-and-run.bat` or run in Command Prompt
+- Automatically installs: MongoDB, Node.js, Python 3.11, Ollama
+- Sets up backend and frontend dependencies
+- Launches all services in separate windows
+
+#### **Windows/Linux/macOS (PowerShell)**
+
+```powershell
+pwsh setup-and-run.ps1
+```
+
+- Cross-platform PowerShell script
+- Works on Windows, Linux, macOS
+- Same functionality as batch script
+- Requires PowerShell 7+ (pre-installed on Windows 10+)
+
+#### **Linux/macOS (Bash Script)**
+
+```bash
+chmod +x setup-and-run.sh
+./setup-and-run.sh
+```
+
+- Native bash script for Unix systems
+- Automatically detects Ubuntu/Debian/CentOS/macOS
+- Uses system package managers (apt, yum, brew)
+- Starts all services automatically
+
+**What the scripts do:**
+
+1. ✅ Check if MongoDB, Node.js, Python, Ollama are installed
+2. ✅ Install missing prerequisites automatically
+3. ✅ Create Python virtual environment
+4. ✅ Install all dependencies (pip, npm)
+5. ✅ Create `.env` from example if missing
+6. ✅ Start MongoDB service
+7. ✅ Start Ollama service
+8. ✅ Pull default model (gemma2:2b)
+9. ✅ Launch backend (FastAPI) in new terminal
+10. ✅ Launch frontend (Vite) in new terminal
+11. ✅ Log everything to `logs/` directory
+
+**After running:** Just wait ~30 seconds and open http://localhost:5173
+
+---
+
+### Manual Setup (If you prefer step-by-step)
+
+If you prefer to install everything manually, follow the detailed instructions below.
 
 ### Prerequisites
 
@@ -85,6 +152,7 @@ Before you begin, make sure you have:
 #### Option 1: Local MongoDB (Recommended for Development)
 
 **Windows:**
+
 ```bash
 # Download MongoDB Community Server from mongodb.com
 # Install with default settings
@@ -96,6 +164,7 @@ mongosh
 ```
 
 **macOS (using Homebrew):**
+
 ```bash
 # Install MongoDB
 brew tap mongodb/brew
@@ -109,6 +178,7 @@ mongosh
 ```
 
 **Linux (Ubuntu/Debian):**
+
 ```bash
 # Import MongoDB public key
 wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
@@ -155,6 +225,7 @@ mongosh "mongodb://127.0.0.1:27017"
 ### Installation
 
 #### 1. Clone the Repository
+
 ```bash
 git clone https://github.com/lebiraja/plugin.git
 cd plugin
@@ -193,6 +264,7 @@ cp .env.example .env
 ```
 
 Your `backend/.env` should look like:
+
 ```env
 # MongoDB Configuration
 MONGODB_URL=mongodb://127.0.0.1:27017  # Local MongoDB
@@ -224,6 +296,7 @@ PORT=8000
 ```
 
 **Important MongoDB Notes:**
+
 - For **local MongoDB**: Use `mongodb://127.0.0.1:27017`
 - For **MongoDB Atlas**: Use your connection string from Atlas dashboard
 - The database (`chat_app`) and collections will be created automatically
@@ -258,6 +331,7 @@ ollama serve
 #### Method 1: Separate Terminals (Recommended for Development)
 
 **Terminal 1 - Start MongoDB (if using local):**
+
 ```bash
 # Windows (if not running as service)
 "C:\Program Files\MongoDB\Server\7.0\bin\mongod.exe" --dbpath="C:\data\db"
@@ -269,6 +343,7 @@ brew services start mongodb-community@7.0  # macOS
 ```
 
 **Terminal 2 - Backend:**
+
 ```bash
 cd backend
 .\venv\Scripts\activate  # Windows
@@ -284,6 +359,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 **Terminal 3 - Frontend:**
+
 ```bash
 # From project root
 npm run dev
@@ -307,6 +383,7 @@ python main.py
 ### Access the App
 
 Open your browser and go to:
+
 ```
 http://localhost:5173  # Development mode
 # or
@@ -330,11 +407,13 @@ http://localhost:8000  # Production mode
 The app now features persistent chat sessions similar to ChatGPT:
 
 **Creating Sessions:**
+
 - Click **"+ New Chat"** button to start a fresh conversation
 - Each session gets a unique ID and is stored in MongoDB
 - Sessions automatically get smart titles after the first exchange
 
 **Session History:**
+
 - Left sidebar shows all your chat sessions organized by time:
   - **Today** - Sessions created today
   - **Yesterday** - Sessions from yesterday
@@ -343,11 +422,13 @@ The app now features persistent chat sessions similar to ChatGPT:
 - Click any session to load its full conversation history
 
 **Smart Auto-Titles:**
+
 - After your first message and AI response, the session automatically gets a 3-4 word title
 - Title is generated by the AI based on the conversation context
 - Example: "Python Programming Help" or "Database Design Questions"
 
 **Session Management:**
+
 - Hover over a session to see the delete button
 - Delete unwanted sessions (permanently removes from MongoDB)
 - Sessions persist across browser refreshes and app restarts
@@ -374,6 +455,7 @@ AI: You mentioned that you love Python programming!
 ### 4. Toggle Tools On/Off
 
 In the left sidebar, click the tool buttons to enable/disable:
+
 - **RAG** - For uploaded document Q&A (blue when active)
 - **Web Search** - For current information (blue when active)
 - **Deep Research** - For complex multi-step reasoning (blue when active)
@@ -383,12 +465,14 @@ Tools are session-specific and persist with your session settings.
 ### 5. Upload and Query Documents (Enhanced with File Cards!)
 
 **Upload Files:**
+
 1. **Click paperclip icon** 📎 in the chat input area
 2. **Select files** - PDF, DOCX, or TXT (max 10MB per file)
 3. **Files are processed** - Automatically chunked, embedded, and stored in MongoDB
 4. **File cards appear** - See your uploaded files displayed as cards in the chat
 
 **File Cards Display:**
+
 - Each uploaded file shows as a card with:
   - 📄 **File icon** (color-coded by type)
   - 📝 **Filename**
@@ -397,12 +481,14 @@ Tools are session-specific and persist with your session settings.
 - Files are organized in a "Knowledge Base" section above the chat input
 
 **Query Documents:**
+
 1. **Enable RAG** - Click the RAG button in left sidebar (turns blue)
 2. **Ask questions** - "What are the main points in the document?"
 3. **Get contextualized answers** - AI uses relevant chunks from your files
 4. **See sources** - Citations show which file chunks were used
 
 **File Persistence:**
+
 - Files are linked to specific chat sessions
 - File metadata and embeddings stored in MongoDB
 - Files persist across sessions and app restarts
@@ -419,6 +505,7 @@ Tools are session-specific and persist with your session settings.
 ### 7. View Statistics
 
 Right sidebar shows session statistics:
+
 - 📊 **Message count** - Total messages in current session
 - 📝 **Token usage** - Estimated tokens used
 - 📁 **Files uploaded** - Number of files in knowledge base
@@ -428,6 +515,7 @@ Right sidebar shows session statistics:
 ## 🏗️ Architecture
 
 ### Frontend Stack
+
 - **React 18.3** - Modern UI library with hooks
 - **TypeScript 5.5** - Type-safe JavaScript
 - **Vite 5.4** - Lightning-fast build tool
@@ -438,6 +526,7 @@ Right sidebar shows session statistics:
 - **React Router** - Session-based routing (`/chat/:sessionId`)
 
 ### Backend Stack
+
 - **FastAPI 0.115** - High-performance async Python API
 - **MongoDB (Motor 3.6)** - Async MongoDB driver for Python
   - **Collections**: `chat_sessions` (sessions & messages), `knowledge_base` (RAG chunks)
@@ -450,6 +539,7 @@ Right sidebar shows session statistics:
 - **Serper.dev** - Primary web search (Google results)
 
 ### LLM Integrations
+
 - **Ollama API** - Local model serving (127.0.0.1:11434)
 - **LM Studio** - OpenAI-compatible API (localhost:1234)
 - **Custom backends** - Bring your own API
@@ -511,6 +601,7 @@ Right sidebar shows session statistics:
 ```
 
 **Indexes:**
+
 - `chat_sessions`: session_id, created_at, updated_at
 - `knowledge_base`: file_id, session_id, created_at, compound(session_id + file_id)
 
@@ -598,6 +689,7 @@ PORT=8000
 ### Frontend Configuration
 
 All settings are now stored in MongoDB per session:
+
 - Selected backend and model (per session)
 - Tool toggles (RAG, web search, deep research)
 - Conversation history (messages array)
@@ -708,6 +800,7 @@ db.chat_sessions.deleteMany({
 ### Custom Model Parameters
 
 Models use these default parameters (can be modified per message):
+
 ```typescript
 {
   temperature: 0.7,    // Creativity (0.0 = focused, 1.0 = creative)
@@ -725,21 +818,21 @@ Edit `src/store/settingsStore.ts`:
 ```typescript
 backends: [
   {
-    id: 'ollama',
-    name: 'Ollama',
-    url: 'http://127.0.0.1:11434',
-    type: 'ollama',
+    id: "ollama",
+    name: "Ollama",
+    url: "http://127.0.0.1:11434",
+    type: "ollama",
     isActive: true,
   },
   {
-    id: 'custom',
-    name: 'My Custom Backend',
-    url: 'https://my-api.example.com',
-    type: 'openai',  // Use OpenAI-compatible format
-    apiKey: 'optional-key',
+    id: "custom",
+    name: "My Custom Backend",
+    url: "https://my-api.example.com",
+    type: "openai", // Use OpenAI-compatible format
+    apiKey: "optional-key",
     isActive: true,
   },
-]
+];
 ```
 
 ### Customizing Embeddings
@@ -762,8 +855,8 @@ Edit `src/components/MessageList.tsx`:
 
 ```typescript
 animate={{ opacity: 1, y: 0 }}
-transition={{ 
-  type: "spring", 
+transition={{
+  type: "spring",
   stiffness: 100,  // Lower = slower bounce
   damping: 15      // Higher = less bounce
 }}
@@ -775,20 +868,78 @@ Edit `src/index.css`:
 
 ```css
 .assistant-message {
-  background: linear-gradient(135deg, 
-    rgba(59, 130, 246, 0.1),    /* Adjust colors */
-    rgba(147, 51, 234, 0.1)
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.1),
+    /* Adjust colors */ rgba(147, 51, 234, 0.1)
   );
 }
 ```
 
 ## 🐛 Troubleshooting
 
+### Automated Setup Script Issues
+
+#### **Script execution disabled (PowerShell)**
+
+**Problem:** `setup-and-run.ps1 cannot be loaded because running scripts is disabled`
+
+**Solution:**
+
+```powershell
+# Run PowerShell as Administrator
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+# Then run the script again
+pwsh setup-and-run.ps1
+```
+
+#### **Permission denied (Linux/macOS)**
+
+**Problem:** `bash: ./setup-and-run.sh: Permission denied`
+
+**Solution:**
+
+```bash
+chmod +x setup-and-run.sh
+./setup-and-run.sh
+```
+
+#### **Script hangs during installation**
+
+**Problem:** Script appears stuck during MongoDB/Ollama installation
+
+**Solution:**
+
+- Check `logs/setup_*.log` for detailed error messages
+- Ensure you have internet connection
+- Run with administrator/sudo privileges if needed
+- Manually install the stuck component and rerun script
+
+#### **Services won't start**
+
+**Problem:** MongoDB or Ollama service fails to start
+
+**Solution:**
+
+```bash
+# Check if ports are already in use
+# Windows:
+netstat -ano | findstr :27017
+netstat -ano | findstr :11434
+
+# Linux/macOS:
+lsof -i :27017
+lsof -i :11434
+
+# Kill processes using the ports if needed
+```
+
 ### MongoDB connection failed
 
 **Problem:** `Failed to connect to MongoDB` error on startup
 
 **Solution:**
+
 ```bash
 # Check if MongoDB is running
 mongosh
@@ -814,6 +965,7 @@ sudo systemctl start mongod
 **Problem:** `ModuleNotFoundError` or import errors
 
 **Solution:**
+
 ```bash
 cd backend
 .\venv\Scripts\activate
@@ -828,6 +980,7 @@ pip install --upgrade -r requirements.txt
 **Problem:** Model dropdown is empty
 
 **Solution:**
+
 1. Make sure Ollama is running: `ollama serve`
 2. Pull at least one model: `ollama pull gemma2:2b`
 3. Check Ollama URL in `.env`: `OLLAMA_URL=http://127.0.0.1:11434`
@@ -839,6 +992,7 @@ pip install --upgrade -r requirements.txt
 **Problem:** Chat sessions disappear after refresh
 
 **Solution:**
+
 1. Verify MongoDB is running: `mongosh`
 2. Check `MONGODB_URL` in `backend/.env`
 3. Look for connection errors in backend logs
@@ -850,6 +1004,7 @@ pip install --upgrade -r requirements.txt
 **Problem:** Files don't upload or process
 
 **Solution:**
+
 1. Check file size (default max: 10MB)
 2. Ensure `backend/uploads/` directory exists
 3. Check backend logs for errors
@@ -862,6 +1017,7 @@ pip install --upgrade -r requirements.txt
 **Problem:** "what is in the file" doesn't use document content
 
 **Solution:**
+
 1. Ensure RAG toggle is ON (blue) in left sidebar
 2. Check that file was uploaded successfully (file card appears)
 3. Wait for embedding to complete (check `embedded: true` in file metadata)
@@ -878,6 +1034,7 @@ pip install --upgrade -r requirements.txt
 **Problem:** "Web Search Unavailable" message
 
 **Solution:**
+
 1. Get free API key from [serper.dev](https://serper.dev/api-keys)
 2. Add to `backend/.env`: `SERPER_API_KEY=your_key_here`
 3. Restart backend server
@@ -889,6 +1046,7 @@ pip install --upgrade -r requirements.txt
 **Problem:** Uploaded files don't display as cards
 
 **Solution:**
+
 1. Check that file upload completed successfully
 2. Verify session has files array in MongoDB:
    ```javascript
@@ -904,6 +1062,7 @@ pip install --upgrade -r requirements.txt
 **Problem:** AI doesn't remember previous messages in session
 
 **Solution:**
+
 - This is built-in now! Uses full session history from MongoDB
 - Make sure you're in the same session (check session_id in URL)
 - Check MongoDB for messages: `db.chat_sessions.findOne({session_id: "..."})`
@@ -915,6 +1074,7 @@ pip install --upgrade -r requirements.txt
 **Problem:** Sessions show as "New Chat" instead of AI-generated titles
 
 **Solution:**
+
 1. Title generates after first message exchange (user + assistant)
 2. Check backend logs for title generation errors
 3. Make sure LLM backend is responding correctly
@@ -926,6 +1086,7 @@ pip install --upgrade -r requirements.txt
 **Problem:** Changes don't appear after updates
 
 **Solution:**
+
 ```bash
 # Hard refresh
 Ctrl + F5  (Windows)
@@ -941,17 +1102,20 @@ npm run build
 ## 🛠️ Development
 
 ### Run Backend Tests
+
 ```bash
 cd backend
 pytest
 ```
 
 ### Run Frontend in Dev Mode
+
 ```bash
 npm run dev
 ```
 
 ### Build for Production
+
 ```bash
 npm run build
 cd backend
@@ -959,6 +1123,7 @@ python main.py  # Serves built frontend + API
 ```
 
 ### Lint and Format
+
 ```bash
 # Frontend
 npm run lint
@@ -1011,6 +1176,7 @@ Contributions are welcome! Here's how:
 5. Open a Pull Request
 
 ### Development Guidelines
+
 - Follow TypeScript/Python best practices
 - Add comments for complex logic
 - Test before submitting
@@ -1038,6 +1204,7 @@ This project is licensed under the MIT License - see LICENSE file for details.
 ## 🗺️ Roadmap
 
 Future features planned:
+
 - [ ] Multi-modal support (image input)
 - [ ] Voice chat integration
 - [ ] Custom prompt templates
@@ -1056,6 +1223,7 @@ Future features planned:
 ## 📝 Changelog
 
 ### Version 2.0.0 (November 2025) - Major Update 🎉
+
 - ✅ **Persistent Chat Sessions** - MongoDB-backed session management
 - ✅ **ChatGPT-Style Interface** - Session history sidebar with time-based grouping
 - ✅ **Smart Auto-Titles** - AI generates 3-4 word titles after first exchange
@@ -1070,6 +1238,7 @@ Future features planned:
 - ✅ **Database Indexes** - Optimized queries for sessions and files
 
 ### Version 1.0.0 (October 2025)
+
 - ✅ Interactive model selector with auto-fetch
 - ✅ Conversation memory (last 10 messages)
 - ✅ Interactive tool toggle buttons
@@ -1086,4 +1255,4 @@ Future features planned:
 
 **Made with ❤️ by [lebiraja](https://github.com/lebiraja)**
 
-*Star ⭐ this repo if you find it helpful!*
+_Star ⭐ this repo if you find it helpful!_

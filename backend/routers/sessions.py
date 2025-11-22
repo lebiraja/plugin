@@ -4,7 +4,7 @@ FastAPI router for chat session management
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict
 from datetime import datetime
 import os
 import shutil
