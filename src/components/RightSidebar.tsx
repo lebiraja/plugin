@@ -1,17 +1,99 @@
-import { FileText, Database, Activity, Trash2, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { FileText, Database, Activity, Trash2, Loader2, PanelRightClose, GripVertical } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useFileStore } from '../store/fileStore'
 import { useChatStore } from '../store/chatStore'
 import { deleteFile } from '../api/files'
 
-export default function RightSidebar() {
+interface RightSidebarProps {
+  width?: number;
+  onToggle?: () => void;
+  onResize?: (width: number) => void;
+}
+
+export default function RightSidebar({ width = 320, onToggle, onResize }: RightSidebarProps) {
   const [activeTab, setActiveTab] = useState<'files' | 'stats' | 'context'>('stats')
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  // Resize handler
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing || !onResize || !sidebarRef.current) return;
+      
+      const sidebarRect = sidebarRef.current.getBoundingClientRect();
+      const newWidth = sidebarRect.right - e.clientX;
+      if (newWidth >= 240 && newWidth <= 600) {
+        onResize(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, onResize]);
 
   return (
-    <aside className="w-80 glass-panel m-4 p-4 flex flex-col gap-4 h-[calc(100vh-2rem)]">
+    <aside 
+      ref={sidebarRef}
+      style={{ width }}
+      className="glass-panel m-4 p-4 flex flex-col gap-4 h-[calc(100vh-2rem)] relative"
+    >
+      {/* Collapse Button */}
+      {onToggle && (
+        <motion.button
+          whileHover={{ scale: 1.1, x: -2 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onToggle}
+          className="absolute top-4 -left-3 z-50 w-6 h-6 bg-dark-850/95 backdrop-blur-md border border-glass-border-strong rounded-full flex items-center justify-center shadow-glow hover:shadow-glow-strong transition-all duration-300"
+          title="Close sidebar (Cmd+\\)"
+        >
+          <PanelRightClose className="w-3.5 h-3.5 text-primary" />
+        </motion.button>
+      )}
+
+      {/* Resize Handle */}
+      {onResize && (
+        <div
+          onMouseDown={handleMouseDown}
+          className={`absolute top-0 left-0 w-1 h-full cursor-col-resize group hover:bg-primary/30 transition-colors ${
+            isResizing ? 'bg-primary/50' : ''
+          }`}
+        >
+          <div className="absolute top-1/2 -translate-y-1/2 left-0 w-4 h-16 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <GripVertical className="w-3 h-3 text-primary" />
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-glass-bg rounded-lg">
+      <div className="flex gap-1 p-1 bg-glass-bg/50 rounded-xl border border-glass-border relative">
+        <div
+          className="tab-indicator"
+          style={{
+            left: activeTab === 'stats' ? '4px' : activeTab === 'files' ? 'calc(33.33% + 2px)' : 'calc(66.66%)',
+            width: 'calc(33.33% - 8px)',
+          }}
+        />
         <TabButton
           icon={<Activity className="w-4 h-4" />}
           label="Stats"
@@ -51,10 +133,12 @@ interface TabButtonProps {
 
 function TabButton({ icon, label, active, onClick }: TabButtonProps) {
   return (
-    <button
+    <motion.button
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
-        active ? 'bg-primary text-white' : 'text-gray-400 hover:text-gray-200'
+      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all duration-300 relative z-10 ${
+        active ? 'text-white' : 'text-gray-400 hover:text-gray-200'
       }`}
     >
       {icon}

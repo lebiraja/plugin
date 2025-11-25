@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { UnifiedChatInterface } from "./components/UnifiedChatInterface";
@@ -10,8 +10,61 @@ import { BackendStatusBanner } from "./components/common/BackendStatusBanner";
 
 function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
-  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem("rightSidebarOpen");
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem("leftSidebarOpen");
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem("leftSidebarWidth");
+    return saved ? parseInt(saved) : 320;
+  });
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem("rightSidebarWidth");
+    return saved ? parseInt(saved) : 320;
+  });
+
+  // Save sidebar states to localStorage
+  useEffect(() => {
+    localStorage.setItem("leftSidebarOpen", JSON.stringify(isLeftSidebarOpen));
+  }, [isLeftSidebarOpen]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "rightSidebarOpen",
+      JSON.stringify(isRightSidebarOpen)
+    );
+  }, [isRightSidebarOpen]);
+
+  useEffect(() => {
+    localStorage.setItem("leftSidebarWidth", leftSidebarWidth.toString());
+  }, [leftSidebarWidth]);
+
+  useEffect(() => {
+    localStorage.setItem("rightSidebarWidth", rightSidebarWidth.toString());
+  }, [rightSidebarWidth]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + B to toggle left sidebar
+      if ((e.metaKey || e.ctrlKey) && e.key === "b") {
+        e.preventDefault();
+        setIsLeftSidebarOpen((prev) => !prev);
+      }
+      // Cmd/Ctrl + \ to toggle right sidebar
+      if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
+        e.preventDefault();
+        setIsRightSidebarOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyboard);
+    return () => window.removeEventListener("keydown", handleKeyboard);
+  }, []);
 
   return (
     <BrowserRouter>
@@ -19,7 +72,12 @@ function App() {
         <BackendStatusBanner />
         <div className="flex h-screen overflow-hidden">
           {/* Left Sidebar - Session History */}
-          <SessionSidebar isOpen={isLeftSidebarOpen} />
+          <SessionSidebar
+            isOpen={isLeftSidebarOpen}
+            width={leftSidebarWidth}
+            onToggle={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
+            onResize={setLeftSidebarWidth}
+          />
 
           {/* Main Chat Area */}
           <main className="flex-1 flex flex-col overflow-hidden">
@@ -29,9 +87,13 @@ function App() {
                 path="/chat/:sessionId"
                 element={
                   <UnifiedChatInterface
+                    onToggleLeftSidebar={() =>
+                      setIsLeftSidebarOpen(!isLeftSidebarOpen)
+                    }
                     onToggleRightSidebar={() =>
                       setIsRightSidebarOpen(!isRightSidebarOpen)
                     }
+                    isLeftSidebarOpen={isLeftSidebarOpen}
                     isRightSidebarOpen={isRightSidebarOpen}
                   />
                 }
@@ -43,13 +105,18 @@ function App() {
           <motion.div
             initial={false}
             animate={{
-              width: isRightSidebarOpen ? 320 : 0,
+              width: isRightSidebarOpen ? rightSidebarWidth : 0,
               opacity: isRightSidebarOpen ? 1 : 0,
             }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="overflow-hidden"
+            className="overflow-hidden relative"
+            style={{ flexShrink: 0 }}
           >
-            <RightSidebar />
+            <RightSidebar
+              width={rightSidebarWidth}
+              onToggle={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+              onResize={setRightSidebarWidth}
+            />
           </motion.div>
 
           {/* Settings Modal */}

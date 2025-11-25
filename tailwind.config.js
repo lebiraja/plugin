@@ -56,7 +56,7 @@ export default {
         "scale-in": "scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
         "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         "pulse-glow": "pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "shimmer": "shimmer 2s linear infinite",
+        shimmer: "shimmer 2s linear infinite",
         "bounce-subtle": "bounceSubtle 0.6s ease-in-out",
       },
       keyframes: {
@@ -115,8 +115,10 @@ export default {
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
-        "gradient-conic": "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
-        "shimmer-gradient": "linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)",
+        "gradient-conic":
+          "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
+        "shimmer-gradient":
+          "linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)",
       },
     },
   },

@@ -6,13 +6,13 @@
   * {
     @apply border-glass-border;
   }
-  
+
   body {
     @apply bg-dark-950 text-gray-100 font-sans antialiased;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-      sans-serif;
-    background: linear-gradient(135deg, #080A0D 0%, #0E1116 50%, #141820 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+      "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+      "Helvetica Neue", sans-serif;
+    background: linear-gradient(135deg, #080a0d 0%, #0e1116 50%, #141820 100%);
     background-attachment: fixed;
   }
 
@@ -37,12 +37,12 @@
     @apply px-4 py-2.5 rounded-2xl bg-glass-bg backdrop-blur-md border border-glass-border hover:bg-glass-hover transition-all duration-300;
     transform: translateY(0);
   }
-  
+
   .glass-button:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(61, 124, 255, 0.15);
   }
-  
+
   .glass-button:active {
     transform: translateY(0);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -87,13 +87,17 @@
   }
 
   .user-message::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     right: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, rgba(61, 124, 255, 0.1) 0%, transparent 60%);
+    background: linear-gradient(
+      135deg,
+      rgba(61, 124, 255, 0.1) 0%,
+      transparent 60%
+    );
     border-radius: inherit;
   }
 
@@ -104,19 +108,23 @@
     position: relative;
     overflow: hidden;
   }
-  
+
   .assistant-message::after {
-    content: '';
+    content: "";
     position: absolute;
     top: -50%;
     left: -50%;
     width: 200%;
     height: 200%;
-    background: radial-gradient(circle, rgba(61, 124, 255, 0.05) 0%, transparent 70%);
+    background: radial-gradient(
+      circle,
+      rgba(61, 124, 255, 0.05) 0%,
+      transparent 70%
+    );
     opacity: 0;
     transition: opacity 0.4s;
   }
-  
+
   .assistant-message:hover::after {
     opacity: 1;
   }
@@ -147,13 +155,18 @@
   }
 
   .glow-border::before {
-    content: '';
+    content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
     padding: 1px;
-    background: linear-gradient(135deg, rgba(61, 124, 255, 0.5), rgba(76, 201, 240, 0.3));
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    background: linear-gradient(
+      135deg,
+      rgba(61, 124, 255, 0.5),
+      rgba(76, 201, 240, 0.3)
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     opacity: 0;
@@ -171,13 +184,18 @@
   }
 
   .shimmer::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: -200%;
     width: 200%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.1),
+      transparent
+    );
     animation: shimmer 3s infinite;
   }
 
@@ -260,7 +278,8 @@
   .tab-indicator {
     @apply absolute bottom-0 h-0.5 bg-gradient-to-r from-primary via-neon-cyan to-primary;
     @apply shadow-glow;
-    transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1), width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+      width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
 
@@ -294,7 +313,8 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -337,7 +357,8 @@
   @apply text-gray-50 font-semibold;
 }
 
-.prose ul, .prose ol {
+.prose ul,
+.prose ol {
   @apply my-3 space-y-1;
 }
 
@@ -349,7 +370,10 @@
   @apply border-l-4 border-primary/50 pl-4 italic text-gray-300 bg-glass-bg/30 py-2 rounded-r-xl;
 }
 
-.prose h1, .prose h2, .prose h3, .prose h4 {
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
   @apply text-gray-50 font-semibold mt-6 mb-3;
 }
 
@@ -369,7 +393,8 @@
   @apply border-collapse w-full my-4 rounded-xl overflow-hidden;
 }
 
-.prose th, .prose td {
+.prose th,
+.prose td {
   @apply border border-glass-border px-4 py-2;
 }
 

@@ -13,6 +13,8 @@ import {
   Sparkles,
   Cpu,
   Zap,
+  PanelLeftClose,
+  GripVertical,
 } from "lucide-react";
 import { useSessionStore } from "../store/sessionStore";
 import { useNavigate } from "react-router-dom";
@@ -21,10 +23,18 @@ import { getModels } from "../api/models";
 
 interface SessionSidebarProps {
   isOpen: boolean;
+  width?: number;
+  onToggle?: () => void;
+  onResize?: (width: number) => void;
   onClose?: () => void;
 }
 
-export const SessionSidebar: React.FC<SessionSidebarProps> = ({ isOpen }) => {
+export const SessionSidebar: React.FC<SessionSidebarProps> = ({
+  isOpen,
+  width = 320,
+  onToggle,
+  onResize,
+}) => {
   const {
     sessions,
     currentSessionId,
@@ -44,13 +54,50 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({ isOpen }) => {
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isBackendDropdownOpen, setIsBackendDropdownOpen] = useState(false);
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
 
   const backendDropdownRef = useRef<HTMLDivElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   const activeBackend = settings.backends.find(
     (b) => b.id === settings.activeBackend
   );
+
+  // Resize handler
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing || !onResize) return;
+
+      const newWidth = e.clientX;
+      if (newWidth >= 240 && newWidth <= 600) {
+        onResize(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing, onResize]);
 
   useEffect(() => {
     fetchSessions();
@@ -314,12 +361,41 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({ isOpen }) => {
 
   return (
     <motion.div
+      ref={sidebarRef}
       initial={{ x: -300, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: -300, opacity: 0 }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="w-80 bg-dark-900/50 backdrop-blur-xl border-r border-glass-border-strong h-full flex flex-col shadow-glass-lg"
+      style={{ width }}
+      className="bg-dark-900/50 backdrop-blur-xl border-r border-glass-border-strong h-full flex flex-col shadow-glass-lg relative"
     >
+      {/* Collapse Button */}
+      {onToggle && (
+        <motion.button
+          whileHover={{ scale: 1.1, x: 2 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onToggle}
+          className="absolute top-4 -right-3 z-50 w-6 h-6 bg-dark-850/95 backdrop-blur-md border border-glass-border-strong rounded-full flex items-center justify-center shadow-glow hover:shadow-glow-strong transition-all duration-300"
+          title="Close sidebar (Cmd+B)"
+        >
+          <PanelLeftClose className="w-3.5 h-3.5 text-primary" />
+        </motion.button>
+      )}
+
+      {/* Resize Handle */}
+      {onResize && (
+        <div
+          onMouseDown={handleMouseDown}
+          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize group hover:bg-primary/30 transition-colors ${
+            isResizing ? "bg-primary/50" : ""
+          }`}
+        >
+          <div className="absolute top-1/2 -translate-y-1/2 right-0 w-4 h-16 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <GripVertical className="w-3 h-3 text-primary" />
+          </div>
+        </div>
+      )}
+
       {/* Header with New Chat Button */}
       <div className="p-4 border-b border-glass-border-strong">
         <motion.button
@@ -522,9 +598,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({ isOpen }) => {
               <MessageSquare className="w-8 h-8 text-primary" />
             </div>
             <p className="text-sm text-gray-400 mb-1">No conversations yet</p>
-            <p className="text-xs text-gray-500">
-              Click "New Chat" to start
-            </p>
+            <p className="text-xs text-gray-500">Click "New Chat" to start</p>
           </motion.div>
         ) : (
           <>
