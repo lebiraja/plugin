@@ -143,7 +143,7 @@ function TabButton({ icon, label, active, onClick }: TabButtonProps) {
     >
       {icon}
       <span>{label}</span>
-    </button>
+    </motion.button>
   )
 }
 

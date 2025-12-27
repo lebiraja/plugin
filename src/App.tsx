@@ -53,12 +53,12 @@ function App() {
       // Cmd/Ctrl + B to toggle left sidebar
       if ((e.metaKey || e.ctrlKey) && e.key === "b") {
         e.preventDefault();
-        setIsLeftSidebarOpen((prev) => !prev);
+        setIsLeftSidebarOpen((prev: boolean) => !prev);
       }
       // Cmd/Ctrl + \ to toggle right sidebar
       if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
         e.preventDefault();
-        setIsRightSidebarOpen((prev) => !prev);
+        setIsRightSidebarOpen((prev: boolean) => !prev);
       }
     };
 

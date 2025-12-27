@@ -7,6 +7,8 @@ from docx import Document as DocxDocument
 from PIL import Image
 import csv
 import logging
+import torch
+import gc
 
 logger = logging.getLogger(__name__)
 
@@ -16,13 +18,20 @@ class DocumentProcessor:
 
     def __init__(self):
         self.embedding_model = SentenceTransformer(
-            "nomic-ai/nomic-embed-text-v1.5", trust_remote_code=True
+            "nomic-ai/nomic-embed-text-v1.5", trust_remote_code=True, device="cuda"
         )
         self.chroma_client = chromadb.PersistentClient(path="./vector_db")
         self.collection = self.chroma_client.get_or_create_collection(
             name="documents",
             metadata={"hnsw:space": "cosine"},
         )
+        self.batch_size = 16  # Conservative batch size for GPU memory
+        
+        # Set up CUDA memory optimization
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.set_per_process_memory_fraction(0.9)  # Use up to 90% of GPU memory
+            logger.info(f"Using CUDA device: {torch.cuda.get_device_name()}")
 
         # Check if Tesseract is available
         self.tesseract_available = self._check_tesseract()
@@ -69,9 +78,40 @@ class DocumentProcessor:
         # Split into chunks
         chunks = self._chunk_text(text)
 
-        # Generate embeddings and store
+        # Generate embeddings in batches with GPU memory management
         file_id = Path(file_path).stem
-        embeddings = self.embedding_model.encode(chunks).tolist()
+        embeddings = []
+        
+        for i in range(0, len(chunks), self.batch_size):
+            batch = chunks[i : i + self.batch_size]
+            try:
+                batch_embeddings = self.embedding_model.encode(batch, show_progress_bar=True).tolist()
+                embeddings.extend(batch_embeddings)
+                
+                # Clear GPU cache between batches
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                
+                # Force garbage collection
+                gc.collect()
+                
+                logger.info(f"Processed embedding batch {i // self.batch_size + 1}/{(len(chunks) + self.batch_size - 1) // self.batch_size}")
+            except RuntimeError as e:
+                if "out of memory" in str(e).lower():
+                    logger.error(f"GPU out of memory on batch {i // self.batch_size + 1}. Clearing memory and retrying with smaller batch...")
+                    torch.cuda.empty_cache()
+                    gc.collect()
+                    # Retry with half the batch size
+                    half_batch_size = max(1, self.batch_size // 2)
+                    for j in range(0, len(batch), half_batch_size):
+                        mini_batch = batch[j : j + half_batch_size]
+                        mini_embeddings = self.embedding_model.encode(mini_batch).tolist()
+                        embeddings.extend(mini_embeddings)
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                        gc.collect()
+                else:
+                    raise
 
         self.collection.add(
             ids=[f"{file_id}_{i}" for i in range(len(chunks))],
