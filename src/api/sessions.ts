@@ -126,7 +126,7 @@ export const sessionApi = {
     formData.append("file", file);
 
     const response = await axios.post(
-      `${API_BASE_URL}/sessions/${sessionId}/upload`,
+      `${API_BASE_URL}/files/upload`,
       formData,
       {
         headers: {
