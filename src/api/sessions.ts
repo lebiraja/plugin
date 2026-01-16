@@ -121,7 +121,7 @@ export const sessionApi = {
     return response.data;
   },
 
-  async uploadFile(sessionId: string, file: File): Promise<any> {
+  async uploadFile(_sessionId: string, file: File): Promise<any> {
     const formData = new FormData();
     formData.append("file", file);
 

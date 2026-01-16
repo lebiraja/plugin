@@ -16,7 +16,6 @@ export default function RightSidebar({ width = 320, onToggle, onResize }: RightS
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  // Resize handler
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
@@ -25,7 +24,7 @@ export default function RightSidebar({ width = 320, onToggle, onResize }: RightS
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing || !onResize || !sidebarRef.current) return;
-      
+
       const sidebarRect = sidebarRef.current.getBoundingClientRect();
       const newWidth = sidebarRect.right - e.clientX;
       if (newWidth >= 240 && newWidth <= 600) {
@@ -53,18 +52,18 @@ export default function RightSidebar({ width = 320, onToggle, onResize }: RightS
   }, [isResizing, onResize]);
 
   return (
-    <aside 
+    <aside
       ref={sidebarRef}
       style={{ width }}
-      className="glass-panel m-4 p-4 flex flex-col gap-4 h-[calc(100vh-2rem)] relative"
+      className="liquid-glass m-4 p-4 flex flex-col gap-4 h-[calc(100vh-2rem)] relative"
     >
-      {/* Collapse Button */}
+      {/* Collapse Button - Floating Glass */}
       {onToggle && (
         <motion.button
           whileHover={{ scale: 1.1, x: -2 }}
           whileTap={{ scale: 0.95 }}
           onClick={onToggle}
-          className="absolute top-4 -left-3 z-50 w-6 h-6 bg-dark-850/95 backdrop-blur-md border border-glass-border-strong rounded-full flex items-center justify-center shadow-glow hover:shadow-glow-strong transition-all duration-300"
+          className="absolute top-4 -left-3 z-50 liquid-button-icon w-6 h-6 shadow-liquid"
           title="Close sidebar (Cmd+\\)"
         >
           <PanelRightClose className="w-3.5 h-3.5 text-primary" />
@@ -85,15 +84,8 @@ export default function RightSidebar({ width = 320, onToggle, onResize }: RightS
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-glass-bg/50 rounded-xl border border-glass-border relative">
-        <div
-          className="tab-indicator"
-          style={{
-            left: activeTab === 'stats' ? '4px' : activeTab === 'files' ? 'calc(33.33% + 2px)' : 'calc(66.66%)',
-            width: 'calc(33.33% - 8px)',
-          }}
-        />
+      {/* Floating Tab Bar */}
+      <div className="floating-tab-bar">
         <TabButton
           icon={<Activity className="w-4 h-4" />}
           label="Stats"
@@ -137,9 +129,7 @@ function TabButton({ icon, label, active, onClick }: TabButtonProps) {
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all duration-300 relative z-10 ${
-        active ? 'text-white' : 'text-gray-400 hover:text-gray-200'
-      }`}
+      className={`floating-tab-item flex-1 ${active ? 'active' : ''}`}
     >
       {icon}
       <span>{label}</span>
@@ -158,14 +148,18 @@ function StatsPanel() {
   ]
 
   return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-gray-400">Session Stats</h3>
-      <div className="grid grid-cols-2 gap-2">
+    <div className="space-y-4">
+      <h3 className="text-sm font-medium text-gray-400">Session Stats</h3>
+      <div className="grid grid-cols-2 gap-3">
         {statCards.map((stat) => (
-          <div key={stat.label} className="bg-glass-bg rounded-lg p-3">
-            <div className="text-xs text-gray-400 mb-1">{stat.label}</div>
-            <div className="text-lg font-semibold">{stat.value}</div>
-          </div>
+          <motion.div
+            key={stat.label}
+            whileHover={{ scale: 1.02 }}
+            className="stat-card"
+          >
+            <div className="text-xs text-gray-500 mb-1">{stat.label}</div>
+            <div className="text-lg font-semibold text-gray-100">{stat.value}</div>
+          </motion.div>
         ))}
       </div>
     </div>
@@ -194,17 +188,17 @@ function FilesPanel() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-400">Knowledge Base</h3>
-        <span className="text-xs text-gray-500">{files.length} files</span>
+        <h3 className="text-sm font-medium text-gray-400">Knowledge Base</h3>
+        <span className="text-xs text-gray-600">{files.length} files</span>
       </div>
 
       {files.length === 0 ? (
         <div className="text-center py-8 text-gray-500 text-sm">
-          <Database className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <Database className="w-12 h-12 mx-auto mb-2 opacity-40" />
           <p>No files in knowledge base</p>
-          <p className="text-xs mt-1">Upload files to enable RAG</p>
+          <p className="text-xs mt-1 text-gray-600">Upload files to enable RAG</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -214,17 +208,17 @@ function FilesPanel() {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 10 }}
-              className="bg-glass-bg rounded-lg p-3 hover:bg-glass-hover transition-colors group"
+              className="stat-card hover:bg-liquid-hover transition-colors group"
             >
               <div className="flex items-start justify-between gap-2">
                 <FileText className="w-4 h-4 flex-shrink-0 mt-0.5 text-primary" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{file.name}</div>
+                  <div className="text-sm font-medium truncate text-gray-200">{file.name}</div>
                   <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
                     <span>{(file.size / 1024).toFixed(1)} KB</span>
                     {file.chunks && (
                       <>
-                        <span>·</span>
+                        <span className="w-1 h-1 rounded-full bg-gray-600"></span>
                         <span>{file.chunks} chunks</span>
                       </>
                     )}
@@ -233,13 +227,13 @@ function FilesPanel() {
                 <button
                   onClick={() => handleDeleteFile(file.id)}
                   disabled={deletingFile === file.id}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 rounded transition-all disabled:opacity-50"
+                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-accent-red/20 rounded-lg transition-all disabled:opacity-50"
                   title="Delete file"
                 >
                   {deletingFile === file.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-red-400" />
+                    <Loader2 className="w-4 h-4 animate-spin text-accent-red" />
                   ) : (
-                    <Trash2 className="w-4 h-4 text-red-400" />
+                    <Trash2 className="w-4 h-4 text-accent-red" />
                   )}
                 </button>
               </div>
@@ -255,9 +249,9 @@ function ContextPanel() {
   const { currentContext, currentSearchResults } = useChatStore()
 
   return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-gray-400">Retrieved Context</h3>
-      
+    <div className="space-y-4">
+      <h3 className="text-sm font-medium text-gray-400">Retrieved Context</h3>
+
       {currentContext.length === 0 && currentSearchResults.length === 0 ? (
         <div className="text-center py-8 text-gray-500 text-sm">
           No context retrieved yet
@@ -267,12 +261,12 @@ function ContextPanel() {
           {/* RAG Results */}
           {currentContext.length > 0 && (
             <div>
-              <div className="text-xs font-semibold text-gray-400 mb-2">
+              <div className="text-xs font-medium text-gray-500 mb-2">
                 From Documents ({currentContext.length})
               </div>
               <div className="space-y-2">
                 {currentContext.map((chunk) => (
-                  <div key={chunk.id} className="bg-glass-bg rounded-lg p-3 text-sm">
+                  <div key={chunk.id} className="stat-card text-sm">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <span className="text-xs font-medium text-primary">
                         {chunk.source}
@@ -281,7 +275,7 @@ function ContextPanel() {
                         {(chunk.similarity * 100).toFixed(0)}%
                       </span>
                     </div>
-                    <p className="text-xs text-gray-300 line-clamp-3">
+                    <p className="text-xs text-gray-400 line-clamp-3">
                       {chunk.content}
                     </p>
                   </div>
@@ -293,23 +287,23 @@ function ContextPanel() {
           {/* Search Results */}
           {currentSearchResults.length > 0 && (
             <div>
-              <div className="text-xs font-semibold text-gray-400 mb-2">
+              <div className="text-xs font-medium text-gray-500 mb-2">
                 Web Search ({currentSearchResults.length})
               </div>
               <div className="space-y-2">
                 {currentSearchResults.map((result, idx) => (
-                  <div key={idx} className="bg-glass-bg rounded-lg p-3 text-sm">
-                    <div className="font-medium text-xs mb-1 line-clamp-1">
+                  <div key={idx} className="stat-card text-sm">
+                    <div className="font-medium text-xs mb-1 line-clamp-1 text-gray-200">
                       {result.title}
                     </div>
-                    <p className="text-xs text-gray-400 line-clamp-2 mb-2">
+                    <p className="text-xs text-gray-500 line-clamp-2 mb-2">
                       {result.snippet}
                     </p>
                     <a
                       href={result.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline truncate block"
+                      className="text-xs text-primary hover:text-primary-light hover:underline truncate block"
                     >
                       {result.url}
                     </a>

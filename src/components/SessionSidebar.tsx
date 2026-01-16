@@ -64,7 +64,6 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
     (b) => b.id === settings.activeBackend
   );
 
-  // Resize handler
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
@@ -254,21 +253,21 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
         animate={{ opacity: 1, y: 0 }}
         className="mb-6"
       >
-        <h3 className="text-xs font-semibold text-gray-500 uppercase px-3 mb-3 tracking-wider">
+        <h3 className="text-xs font-medium text-gray-500 uppercase px-3 mb-3 tracking-wider">
           {title}
         </h3>
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {sessions.map((session, index) => (
             <motion.div
               key={session.session_id}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.05 }}
+              transition={{ delay: index * 0.03 }}
               onClick={() => navigate(`/chat/${session.session_id}`)}
               className={`group relative px-3 py-3 rounded-2xl cursor-pointer transition-all duration-300 ${
                 currentSessionId === session.session_id
-                  ? "bg-gradient-to-r from-primary/20 to-neon-cyan/10 border border-primary/30 shadow-glow"
-                  : "hover:bg-glass-hover border border-transparent hover:border-glass-border-strong"
+                  ? "bg-primary/15 border border-primary/25 shadow-glow"
+                  : "hover:bg-liquid-hover border border-transparent hover:border-liquid-border-strong"
               }`}
             >
               {editingId === session.session_id ? (
@@ -284,24 +283,24 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
                       if (e.key === "Enter") handleRename(session.session_id);
                       if (e.key === "Escape") cancelRename();
                     }}
-                    className="flex-1 bg-dark-800 text-white px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 border border-glass-border"
+                    className="flex-1 liquid-input text-sm py-2"
                     autoFocus
                   />
                   <motion.button
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handleRename(session.session_id)}
-                    className="p-1.5 hover:bg-neon-green/20 rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-accent-green/20 rounded-lg transition-colors"
                   >
-                    <Check className="w-4 h-4 text-neon-green" />
+                    <Check className="w-4 h-4 text-accent-green" />
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={cancelRename}
-                    className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-accent-red/20 rounded-lg transition-colors"
                   >
-                    <X className="w-4 h-4 text-red-400" />
+                    <X className="w-4 h-4 text-accent-red" />
                   </motion.button>
                 </div>
               ) : (
@@ -315,13 +314,13 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
                         </h4>
                       </div>
                       {session.last_message_preview && (
-                        <p className="text-xs text-gray-400 truncate mt-1.5 ml-6">
+                        <p className="text-xs text-gray-500 truncate mt-1.5 ml-6">
                           {session.last_message_preview}
                         </p>
                       )}
-                      <div className="flex items-center space-x-2 text-xs text-gray-500 mt-2 ml-6">
+                      <div className="flex items-center space-x-2 text-xs text-gray-600 mt-2 ml-6">
                         <span>{formatDate(session.updated_at)}</span>
-                        <span className="w-1 h-1 rounded-full bg-gray-600"></span>
+                        <span className="w-1 h-1 rounded-full bg-gray-700"></span>
                         <span>{session.message_count} msgs</span>
                       </div>
                     </div>
@@ -332,7 +331,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
                         onClick={(e) =>
                           startRename(session.session_id, session.title, e)
                         }
-                        className="p-1.5 hover:bg-glass-hover rounded-lg transition-colors"
+                        className="p-1.5 hover:bg-liquid-hover rounded-lg transition-colors"
                       >
                         <Edit2 className="w-3.5 h-3.5 text-gray-400" />
                       </motion.button>
@@ -342,9 +341,9 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
                         onClick={(e) =>
                           handleDeleteSession(session.session_id, e)
                         }
-                        className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors"
+                        className="p-1.5 hover:bg-accent-red/20 rounded-lg transition-colors"
                       >
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        <Trash2 className="w-3.5 h-3.5 text-accent-red" />
                       </motion.button>
                     </div>
                   </div>
@@ -367,15 +366,15 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
       exit={{ x: -300, opacity: 0 }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
       style={{ width }}
-      className="bg-dark-900/50 backdrop-blur-xl border-r border-glass-border-strong h-full flex flex-col shadow-glass-lg relative"
+      className="liquid-glass-subtle border-r border-liquid-border h-full flex flex-col shadow-liquid-lg relative"
     >
-      {/* Collapse Button */}
+      {/* Collapse Button - Floating Glass */}
       {onToggle && (
         <motion.button
           whileHover={{ scale: 1.1, x: 2 }}
           whileTap={{ scale: 0.95 }}
           onClick={onToggle}
-          className="absolute top-4 -right-3 z-50 w-6 h-6 bg-dark-850/95 backdrop-blur-md border border-glass-border-strong rounded-full flex items-center justify-center shadow-glow hover:shadow-glow-strong transition-all duration-300"
+          className="absolute top-4 -right-3 z-50 liquid-button-icon w-6 h-6 shadow-liquid"
           title="Close sidebar (Cmd+B)"
         >
           <PanelLeftClose className="w-3.5 h-3.5 text-primary" />
@@ -397,12 +396,12 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
       )}
 
       {/* Header with New Chat Button */}
-      <div className="p-4 border-b border-glass-border-strong">
+      <div className="p-4 border-b border-liquid-border">
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={handleNewChat}
-          className="w-full neon-button flex items-center justify-center space-x-2 group"
+          className="w-full liquid-button-primary flex items-center justify-center space-x-2 group py-3"
         >
           <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
           <span className="font-semibold">New Chat</span>
@@ -411,10 +410,10 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
       </div>
 
       {/* Backend & Model Selectors */}
-      <div className="px-4 pt-4 pb-3 border-b border-glass-border space-y-4">
+      <div className="px-4 pt-4 pb-3 border-b border-liquid-border space-y-4">
         {/* Backend Selector */}
         <div className="space-y-2">
-          <label className="text-xs text-gray-400 uppercase font-semibold tracking-wider flex items-center space-x-2">
+          <label className="text-xs text-gray-500 uppercase font-medium tracking-wider flex items-center space-x-2">
             <Cpu className="w-3.5 h-3.5" />
             <span>Backend</span>
           </label>
@@ -423,7 +422,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
               onClick={() => setIsBackendDropdownOpen(!isBackendDropdownOpen)}
-              className="w-full glass-input text-sm flex items-center justify-between group"
+              className="w-full liquid-input text-sm flex items-center justify-between py-2.5"
             >
               <span className="truncate text-gray-200">
                 {activeBackend?.name || "No backend selected"}
@@ -441,7 +440,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute top-full left-0 right-0 mt-2 glass-dropdown p-2 z-10 space-y-1"
+                  className="absolute top-full left-0 right-0 mt-2 liquid-dropdown z-10 space-y-1"
                 >
                   {settings.backends.map((backend) => (
                     <motion.button
@@ -450,7 +449,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
                       onClick={() => handleBackendChange(backend.id)}
                       className={`dropdown-item w-full text-left ${
                         backend.id === settings.activeBackend
-                          ? "dropdown-item-active"
+                          ? "active"
                           : ""
                       }`}
                     >
@@ -466,7 +465,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
         {/* Model Selector */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="text-xs text-gray-400 uppercase font-semibold tracking-wider flex items-center space-x-2">
+            <label className="text-xs text-gray-500 uppercase font-medium tracking-wider flex items-center space-x-2">
               <Zap className="w-3.5 h-3.5" />
               <span>Model</span>
             </label>
@@ -475,7 +474,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
               transition={{ duration: 0.3 }}
               onClick={handleRefreshModels}
               disabled={isLoadingModels}
-              className="p-1 hover:bg-glass-hover rounded-lg transition-colors disabled:opacity-50"
+              className="p-1 hover:bg-liquid-hover rounded-lg transition-colors disabled:opacity-50"
               title="Refresh models"
             >
               <RefreshCw
@@ -491,7 +490,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
               whileTap={{ scale: 0.99 }}
               onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
               disabled={isLoadingModels || availableModels.length === 0}
-              className="w-full glass-input text-sm flex items-center justify-between disabled:opacity-50"
+              className="w-full liquid-input text-sm flex items-center justify-between py-2.5 disabled:opacity-50"
             >
               <span className="truncate text-gray-200">
                 {isLoadingModels
@@ -514,7 +513,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute top-full left-0 right-0 mt-2 glass-dropdown p-2 z-10 space-y-1 max-h-64 overflow-y-auto scrollbar-thin"
+                  className="absolute top-full left-0 right-0 mt-2 liquid-dropdown z-10 space-y-1 max-h-64 overflow-y-auto scrollbar-thin"
                 >
                   {availableModels.map((model) => (
                     <motion.button
@@ -523,7 +522,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
                       onClick={() => handleModelChange(model)}
                       className={`dropdown-item w-full text-left ${
                         model === settings.activeModel
-                          ? "dropdown-item-active"
+                          ? "active"
                           : ""
                       }`}
                     >
@@ -538,20 +537,20 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
 
         {/* Tools Toggles */}
         <div className="space-y-2">
-          <label className="text-xs text-gray-400 uppercase font-semibold tracking-wider">
+          <label className="text-xs text-gray-500 uppercase font-medium tracking-wider">
             Tools
           </label>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {Object.entries(settings.toolsConfig).map(([key, enabled]) => (
               <motion.button
                 key={key}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
                 onClick={() => updateToolsConfig({ [key]: !enabled })}
                 className={`w-full px-3 py-2.5 rounded-xl text-xs flex items-center justify-between transition-all duration-300 ${
                   enabled
-                    ? "bg-gradient-to-r from-primary/20 to-neon-cyan/10 border border-primary/30 text-primary shadow-glow"
-                    : "bg-glass-bg/30 border border-glass-border text-gray-400 hover:bg-glass-hover"
+                    ? "bg-primary/15 border border-primary/25 text-primary shadow-glow"
+                    : "bg-liquid-frosted border border-liquid-border text-gray-400 hover:bg-liquid-hover"
                 }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -594,11 +593,11 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
             animate={{ opacity: 1, scale: 1 }}
             className="text-center py-12 px-4"
           >
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/20 to-neon-cyan/10 border border-primary/30 flex items-center justify-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
               <MessageSquare className="w-8 h-8 text-primary" />
             </div>
             <p className="text-sm text-gray-400 mb-1">No conversations yet</p>
-            <p className="text-xs text-gray-500">Click "New Chat" to start</p>
+            <p className="text-xs text-gray-600">Click "New Chat" to start</p>
           </motion.div>
         ) : (
           <>

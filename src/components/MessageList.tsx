@@ -33,11 +33,12 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
           exit={{ opacity: 0, y: -10 }}
           className="flex items-center gap-3"
         >
-          <div className="w-8 h-8 rounded-full bg-glass-bg flex items-center justify-center">
-            <Bot className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-full bg-liquid-bg-secondary flex items-center justify-center backdrop-blur-lg border border-liquid-border">
+            <Bot className="w-5 h-5 text-primary" />
           </div>
-          <div className="assistant-message message-bubble">
-            <Loader2 className="w-4 h-4 animate-spin" />
+          <div className="assistant-message message-bubble flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            <span className="text-sm text-gray-400">Thinking...</span>
           </div>
         </motion.div>
       )}
@@ -55,58 +56,58 @@ function MessageBubble({ message, index }: { message: Message; index: number }) 
       initial={{ opacity: 0, y: 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -10, scale: 0.95 }}
-      transition={{ 
-        delay: index * 0.05,
+      transition={{
+        delay: index * 0.03,
         type: "spring",
-        stiffness: 300,
-        damping: 25
+        stiffness: 350,
+        damping: 30
       }}
       className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : ''}`}
     >
-      <motion.div 
+      {/* Avatar with Liquid Glass effect */}
+      <motion.div
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
-        transition={{ delay: index * 0.05 + 0.1, type: "spring" }}
-        className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-          isUser ? 'bg-gradient-to-br from-primary to-primary-dark' : 'bg-glass-bg backdrop-blur-xl'
+        transition={{ delay: index * 0.03 + 0.1, type: "spring" }}
+        className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 backdrop-blur-lg border ${
+          isUser
+            ? 'bg-gradient-to-br from-primary to-primary-dark border-primary/30'
+            : 'bg-liquid-bg-secondary border-liquid-border'
         }`}
       >
         {isUser ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-primary" />}
       </motion.div>
 
       <div className={`flex-1 max-w-3xl ${isUser ? 'flex flex-col items-end' : ''}`}>
-        <motion.div 
+        {/* Message Bubble with Liquid Glass styling */}
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: index * 0.05 + 0.15 }}
+          transition={{ delay: index * 0.03 + 0.15 }}
           className={`message-bubble relative group ${
-            isUser 
-              ? 'user-message bg-gradient-to-br from-primary to-primary-dark' 
-              : 'assistant-message bg-glass-bg backdrop-blur-xl border border-glass-border'
+            isUser
+              ? 'user-message'
+              : 'assistant-message'
           }`}
         >
-          {/* Glow effect for assistant messages */}
-          {!isUser && (
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-          )}
-          
+          {/* Content */}
           <div className="prose prose-invert prose-sm max-w-none relative z-10">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {message.content}
             </ReactMarkdown>
           </div>
-          
+
           {/* Citations if available */}
           {message.citations && message.citations.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-glass-border space-y-1">
-              <div className="text-xs text-gray-400 font-medium">Sources:</div>
+            <div className="mt-3 pt-3 border-t border-liquid-border space-y-1">
+              <div className="text-xs text-gray-500 font-medium">Sources:</div>
               {message.citations.map((citation, idx) => (
                 <a
                   key={idx}
                   href={citation.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block text-xs text-primary hover:underline"
+                  className="block text-xs text-primary hover:text-primary-light hover:underline transition-colors"
                 >
                   [{idx + 1}] {citation.title}
                 </a>
@@ -115,11 +116,12 @@ function MessageBubble({ message, index }: { message: Message; index: number }) 
           )}
         </motion.div>
 
-        <motion.div 
+        {/* Message metadata */}
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: index * 0.05 + 0.2 }}
-          className="flex items-center gap-3 mt-2 text-xs text-gray-500"
+          transition={{ delay: index * 0.03 + 0.2 }}
+          className="flex items-center gap-3 mt-2 text-xs text-gray-600"
         >
           <span>{format(message.timestamp, 'HH:mm')}</span>
           {message.tokens && (
@@ -130,13 +132,13 @@ function MessageBubble({ message, index }: { message: Message; index: number }) 
           )}
           {message.latency && (
             <span className="flex items-center gap-1">
-              <span className="w-1 h-1 rounded-full bg-green-500" />
+              <span className="w-1 h-1 rounded-full bg-accent-green" />
               {message.latency}ms
             </span>
           )}
           {message.model && (
             <span className="flex items-center gap-1">
-              <span className="w-1 h-1 rounded-full bg-blue-500" />
+              <span className="w-1 h-1 rounded-full bg-accent-cyan" />
               {message.model}
             </span>
           )}

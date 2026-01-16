@@ -8,6 +8,7 @@ import {
   FileText,
   Lightbulb,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { useDeepResearchStore } from "../../store/deepResearchStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { deepResearchService } from "../../services/deepResearchService";
@@ -43,10 +44,8 @@ export const DeepResearchPanel: React.FC = () => {
       setError(null);
       clearCurrentResearch();
 
-      // Stage 1: Planning
       updateStage("planning", "Generating research plan...", 10);
 
-      // Simulate stage progression (in real implementation, this would be SSE)
       setTimeout(() => {
         updateStage("searching", "Conducting multi-level search...", 30);
       }, 1000);
@@ -63,7 +62,6 @@ export const DeepResearchPanel: React.FC = () => {
         updateStage("synthesizing", "Synthesizing final report...", 85);
       }, 5000);
 
-      // Conduct actual research
       const result = await deepResearchService.conductResearch({
         query,
         backend: activeBackend,
@@ -72,7 +70,6 @@ export const DeepResearchPanel: React.FC = () => {
         max_sources: maxSources,
       });
 
-      // Complete
       updateStage("complete", "Research complete!", 100);
       setCurrentResearch(result);
       addToHistory(result);
@@ -88,17 +85,17 @@ export const DeepResearchPanel: React.FC = () => {
   const getStageIcon = (stage: ResearchStage) => {
     switch (stage) {
       case "planning":
-        return <FileText className="w-5 h-5 text-gray-300 animate-pulse" />;
+        return <FileText className="w-5 h-5 text-gray-400 animate-pulse" />;
       case "searching":
-        return <Search className="w-5 h-5 text-gray-300 animate-pulse" />;
+        return <Search className="w-5 h-5 text-gray-400 animate-pulse" />;
       case "reasoning":
-        return <Brain className="w-5 h-5 text-gray-300 animate-pulse" />;
+        return <Brain className="w-5 h-5 text-gray-400 animate-pulse" />;
       case "synthesizing":
-        return <Lightbulb className="w-5 h-5 text-gray-300 animate-pulse" />;
+        return <Lightbulb className="w-5 h-5 text-gray-400 animate-pulse" />;
       case "complete":
-        return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+        return <CheckCircle2 className="w-5 h-5 text-accent-green" />;
       case "error":
-        return <AlertCircle className="w-5 h-5 text-red-500" />;
+        return <AlertCircle className="w-5 h-5 text-accent-red" />;
       default:
         return <Search className="w-5 h-5 text-gray-500" />;
     }
@@ -107,13 +104,13 @@ export const DeepResearchPanel: React.FC = () => {
   const getStageLabel = (stage: ResearchStage) => {
     switch (stage) {
       case "planning":
-        return "Research Planning";
+        return "Planning";
       case "searching":
-        return "Multi-Level Search";
+        return "Searching";
       case "reasoning":
-        return "Multi-Hop Reasoning";
+        return "Reasoning";
       case "synthesizing":
-        return "Report Synthesis";
+        return "Synthesizing";
       case "complete":
         return "Complete";
       case "error":
@@ -124,24 +121,29 @@ export const DeepResearchPanel: React.FC = () => {
   };
 
   return (
-    <div className="bg-glass-bg backdrop-blur-sm border border-glass-border rounded-lg p-6 space-y-6">
+    <div className="liquid-glass p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-3">
-        <Brain className="w-6 h-6 text-primary" />
-        <h2 className="text-xl font-semibold text-white">Deep Research</h2>
+        <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center">
+          <Brain className="w-6 h-6 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold text-gray-100">Deep Research</h2>
+          <p className="text-sm text-gray-500">Multi-hop reasoning with evidence synthesis</p>
+        </div>
       </div>
 
       {/* Research Input */}
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label className="block text-sm font-medium text-gray-400 mb-2">
             Research Question
           </label>
           <textarea
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="What would you like to research in depth?"
-            className="w-full px-4 py-3 bg-glass-bg border border-glass-border text-white rounded-lg focus:ring-2 focus:ring-primary/50 focus:outline-none resize-none"
+            className="liquid-input resize-none"
             rows={3}
             disabled={isResearching}
           />
@@ -150,13 +152,13 @@ export const DeepResearchPanel: React.FC = () => {
         {/* Configuration */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-400 mb-2">
               Research Depth
             </label>
             <select
               value={maxDepth}
               onChange={(e) => setMaxDepth(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-glass-bg border border-glass-border text-white rounded-lg focus:ring-2 focus:ring-primary/50 focus:outline-none"
+              className="liquid-select"
               disabled={isResearching}
             >
               <option value={1}>Basic (1 level)</option>
@@ -166,13 +168,13 @@ export const DeepResearchPanel: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-400 mb-2">
               Max Sources
             </label>
             <select
               value={maxSources}
               onChange={(e) => setMaxSources(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-glass-bg border border-glass-border text-white rounded-lg focus:ring-2 focus:ring-primary/50 focus:outline-none"
+              className="liquid-select"
               disabled={isResearching}
             >
               <option value={5}>Quick (5 sources)</option>
@@ -184,10 +186,12 @@ export const DeepResearchPanel: React.FC = () => {
         </div>
 
         {/* Start Button */}
-        <button
+        <motion.button
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
           onClick={handleResearch}
           disabled={isResearching || !query.trim()}
-          className="w-full py-3 bg-primary hover:bg-primary/80 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+          className="w-full liquid-button-primary py-3.5 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isResearching ? (
             <>
@@ -200,12 +204,12 @@ export const DeepResearchPanel: React.FC = () => {
               <span>Start Deep Research</span>
             </>
           )}
-        </button>
+        </motion.button>
       </div>
 
       {/* Progress Indicator */}
       {(isResearching || progress.stage !== "idle") && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {/* Progress Bar */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
@@ -215,87 +219,83 @@ export const DeepResearchPanel: React.FC = () => {
                   {getStageLabel(progress.stage)}
                 </span>
               </div>
-              <span className="text-gray-400">{progress.progress}%</span>
+              <span className="text-gray-500">{progress.progress}%</span>
             </div>
-            <div className="w-full bg-glass-bg border border-glass-border rounded-full h-2">
+            <div className="liquid-progress">
               <div
-                className={`h-2 rounded-full transition-all duration-500 ${
+                className={`liquid-progress-fill ${
                   progress.stage === "error"
-                    ? "bg-red-500"
+                    ? "!bg-accent-red"
                     : progress.stage === "complete"
-                    ? "bg-green-500"
-                    : "bg-primary"
+                    ? "!bg-accent-green"
+                    : ""
                 }`}
                 style={{ width: `${progress.progress}%` }}
               />
             </div>
-            <p className="text-sm text-gray-400">{progress.message}</p>
+            <p className="text-sm text-gray-500">{progress.message}</p>
           </div>
 
           {/* Stage Indicators */}
           <div className="grid grid-cols-4 gap-2">
             {(
               ["planning", "searching", "reasoning", "synthesizing"] as const
-            ).map((stage) => (
-              <div
-                key={stage}
-                className={`p-2 rounded-lg text-center text-xs ${
-                  progress.stage === stage
-                    ? "bg-primary text-white"
-                    : [
-                        "planning",
-                        "searching",
-                        "reasoning",
-                        "synthesizing",
-                      ].indexOf(progress.stage) >
-                      [
-                        "planning",
-                        "searching",
-                        "reasoning",
-                        "synthesizing",
-                      ].indexOf(stage)
-                    ? "bg-green-900/50 text-green-400"
-                    : "bg-glass-bg border border-glass-border text-gray-400"
-                }`}
-              >
-                {getStageLabel(stage)}
-              </div>
-            ))}
+            ).map((stage) => {
+              const stageIndex = ["planning", "searching", "reasoning", "synthesizing"].indexOf(stage);
+              const currentIndex = ["planning", "searching", "reasoning", "synthesizing"].indexOf(progress.stage);
+              const isActive = progress.stage === stage;
+              const isComplete = currentIndex > stageIndex;
+
+              return (
+                <div
+                  key={stage}
+                  className={`p-2 rounded-xl text-center text-xs transition-all ${
+                    isActive
+                      ? "bg-primary/20 text-primary border border-primary/30"
+                      : isComplete
+                      ? "bg-accent-green/10 text-accent-green border border-accent-green/20"
+                      : "bg-liquid-frosted border border-liquid-border text-gray-500"
+                  }`}
+                >
+                  {getStageLabel(stage)}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
       {/* Error Display */}
       {error && (
-        <div className="p-4 bg-red-900/20 border border-red-500/50 rounded-lg flex items-start space-x-3">
-          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+        <div className="p-4 rounded-2xl bg-accent-red/10 border border-accent-red/30 flex items-start space-x-3">
+          <AlertCircle className="w-5 h-5 text-accent-red flex-shrink-0 mt-0.5" />
           <div>
-            <h4 className="font-medium text-red-400">Research Failed</h4>
-            <p className="text-sm text-red-300 mt-1">{error}</p>
+            <h4 className="font-medium text-accent-red">Research Failed</h4>
+            <p className="text-sm text-accent-red/80 mt-1">{error}</p>
           </div>
         </div>
       )}
 
       {/* Quick Stats */}
       {currentResearch && (
-        <div className="grid grid-cols-3 gap-3 pt-4 border-t border-gray-700">
+        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-liquid-border">
           <div className="text-center">
             <div className="text-2xl font-bold text-primary">
               {currentResearch.evidence_count}
             </div>
-            <div className="text-xs text-gray-400">Sources</div>
+            <div className="text-xs text-gray-500">Sources</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-primary">
               {currentResearch.reasoning_trace.length}
             </div>
-            <div className="text-xs text-gray-400">Insights</div>
+            <div className="text-xs text-gray-500">Insights</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-400">
+            <div className="text-2xl font-bold text-accent-green">
               {currentResearch.metadata.time_taken.toFixed(1)}s
             </div>
-            <div className="text-xs text-gray-400">Time</div>
+            <div className="text-xs text-gray-500">Time</div>
           </div>
         </div>
       )}
