@@ -24,7 +24,6 @@ export const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
   const { currentResearch } = useDeepResearchStore();
   const [activeMode, setActiveMode] = useState<"chat" | "research">("chat");
 
-  // Use deep research setting to determine if the mode toggle should be available
   const deepResearchEnabled = settings.toolsConfig.deepResearch;
 
   return (
@@ -39,7 +38,7 @@ export const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={onToggleLeftSidebar}
-              className="w-10 h-10 bg-dark-850/95 backdrop-blur-md border border-glass-border-strong rounded-xl flex items-center justify-center shadow-glow hover:shadow-glow-strong transition-all duration-300"
+              className="liquid-button-icon shadow-liquid"
               title="Open sessions (Cmd+B)"
             >
               <PanelLeft className="w-5 h-5 text-primary" />
@@ -55,7 +54,7 @@ export const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={onToggleRightSidebar}
-              className="w-10 h-10 bg-dark-850/95 backdrop-blur-md border border-glass-border-strong rounded-xl flex items-center justify-center shadow-glow hover:shadow-glow-strong transition-all duration-300"
+              className="liquid-button-icon shadow-liquid"
               title="Open sidebar (Cmd+\\)"
             >
               <PanelRight className="w-5 h-5 text-primary" />
@@ -64,19 +63,15 @@ export const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
         </div>
       </div>
 
-      {/* Mode Toggle */}
+      {/* Floating Tab Bar for Mode Toggle */}
       {deepResearchEnabled && (
-        <div className="bg-dark-850/50 backdrop-blur-md border-b border-glass-border-strong p-3">
-          <div className="flex space-x-2 max-w-md mx-auto">
+        <div className="flex justify-center py-4 px-4">
+          <div className="floating-tab-bar">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setActiveMode("chat")}
-              className={`flex-1 py-2.5 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 ${
-                activeMode === "chat"
-                  ? "bg-gradient-to-r from-primary to-neon-cyan text-white shadow-glow"
-                  : "bg-glass-bg/30 border border-glass-border text-gray-300 hover:bg-glass-hover"
-              }`}
+              className={`floating-tab-item ${activeMode === "chat" ? "active" : ""}`}
             >
               <MessageSquare className="w-4 h-4" />
               <span>Chat</span>
@@ -85,11 +80,7 @@ export const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setActiveMode("research")}
-              className={`flex-1 py-2.5 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2 ${
-                activeMode === "research"
-                  ? "bg-gradient-to-r from-primary to-neon-cyan text-white shadow-glow"
-                  : "bg-glass-bg/30 border border-glass-border text-gray-300 hover:bg-glass-hover"
-              }`}
+              className={`floating-tab-item ${activeMode === "research" ? "active" : ""}`}
             >
               <Brain className="w-4 h-4" />
               <span>Deep Research</span>

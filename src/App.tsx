@@ -70,8 +70,9 @@ function App() {
     <BrowserRouter>
       <ErrorBoundary>
         <BackendStatusBanner />
+        {/* Main Container with depth layering */}
         <div className="flex h-screen overflow-hidden">
-          {/* Left Sidebar - Session History */}
+          {/* Left Sidebar - Session History (z-raised) */}
           <SessionSidebar
             isOpen={isLeftSidebarOpen}
             width={leftSidebarWidth}
@@ -79,8 +80,8 @@ function App() {
             onResize={setLeftSidebarWidth}
           />
 
-          {/* Main Chat Area */}
-          <main className="flex-1 flex flex-col overflow-hidden">
+          {/* Main Content Area - Content First Layout (z-base) */}
+          <main className="flex-1 flex flex-col overflow-hidden relative">
             <Routes>
               <Route path="/" element={<Navigate to="/chat/new" replace />} />
               <Route
@@ -101,15 +102,18 @@ function App() {
             </Routes>
           </main>
 
-          {/* Right Sidebar */}
+          {/* Right Sidebar - Stats/Context (z-floating) */}
           <motion.div
             initial={false}
             animate={{
               width: isRightSidebarOpen ? rightSidebarWidth : 0,
               opacity: isRightSidebarOpen ? 1 : 0,
             }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="overflow-hidden relative"
+            transition={{
+              duration: 0.3,
+              ease: [0.22, 1, 0.36, 1]
+            }}
+            className="overflow-hidden relative z-floating"
             style={{ flexShrink: 0 }}
           >
             <RightSidebar
@@ -119,7 +123,7 @@ function App() {
             />
           </motion.div>
 
-          {/* Settings Modal */}
+          {/* Settings Modal - Elevated overlay (z-modal) */}
           <SettingsModal
             isOpen={isSettingsOpen}
             onClose={() => setIsSettingsOpen(false)}
