@@ -7,6 +7,58 @@ A modern, feature-rich chat interface for interacting with local LLM backends li
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![React](https://img.shields.io/badge/react-18.3+-61dafb.svg)
 ![MongoDB](https://img.shields.io/badge/mongodb-7.0+-47A248.svg)
+[![npm version](https://img.shields.io/npm/v/@lebiraja/plugintool.svg)](https://www.npmjs.com/package/@lebiraja/plugintool)
+
+## 📦 npm Package
+
+This project is available as an npm package for easy integration into your React projects.
+
+### Install
+
+```bash
+npm install @lebiraja/plugintool
+```
+
+### Usage
+
+```tsx
+import {
+  App,
+  ChatInterface,
+  UnifiedChatInterface,
+  useChatStore,
+  useSettingsStore
+} from '@lebiraja/plugintool';
+import type { Message, AppSettings } from '@lebiraja/plugintool';
+
+// Use the full App component
+function MyApp() {
+  return <App />;
+}
+
+// Or use individual components
+function CustomChat() {
+  const { messages, addMessage } = useChatStore();
+
+  return (
+    <ChatInterface
+      onToggleRightSidebar={() => {}}
+      isRightSidebarOpen={true}
+    />
+  );
+}
+```
+
+### Available Exports
+
+| Category | Exports |
+|----------|---------|
+| **Components** | `App`, `ChatInterface`, `UnifiedChatInterface`, `MessageList`, `SessionSidebar`, `RightSidebar`, `SettingsModal`, `FileCard`, `LeftSidebar`, `ErrorBoundary`, `BackendStatusBanner`, `MarkdownRenderer`, `DeepResearchPanel`, `ResearchResultsView` |
+| **Stores** | `useChatStore`, `useSettingsStore`, `useSessionStore`, `useFileStore`, `useDeepResearchStore` |
+| **Hooks** | `useBackendStatus` |
+| **Types** | `Message`, `LLMBackend`, `ModelConfig`, `ToolsConfig`, `AppSettings`, `ChatStats`, `SearchResult`, `RAGResult`, `ResearchResult`, and more |
+
+---
 
 ## ✨ What This App Does
 
