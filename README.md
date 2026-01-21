@@ -2,12 +2,13 @@
 
 A modern, feature-rich chat interface for interacting with local LLM backends like Ollama and LM Studio. Built with React, TypeScript, and FastAPI, featuring **persistent chat sessions**, MongoDB storage, RAG (Retrieval-Augmented Generation), web search, and a beautiful animated UI.
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![React](https://img.shields.io/badge/react-18.3+-61dafb.svg)
 ![MongoDB](https://img.shields.io/badge/mongodb-7.0+-47A248.svg)
 [![npm version](https://img.shields.io/npm/v/@lebiraja/plugintool.svg)](https://www.npmjs.com/package/@lebiraja/plugintool)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 
 ## 📦 npm Package
 
@@ -127,9 +128,33 @@ This is an intelligent chat application that lets you interact with powerful loc
 
 ## 🚀 Quick Start
 
-### 🎯 Automated Setup (Recommended!)
+### 🐳 Docker Setup (Easiest!)
 
-We provide **automated setup scripts** for all platforms that install everything and launch the app automatically:
+Run the entire app with Docker (no manual installation needed):
+
+```bash
+# Clone the repository
+git clone https://github.com/lebiraja/plugin.git
+cd plugin
+
+# Start all services (MongoDB, Backend, Frontend, Ollama)
+docker-compose up -d
+
+# Pull a model
+docker exec -it ollama ollama pull gemma2:2b
+
+# Open the app
+# Frontend: http://localhost:5173
+# Backend: http://localhost:8000
+```
+
+See [Docker-README.md](Docker-README.md) for detailed Docker instructions.
+
+---
+
+### 🎯 Automated Setup (Alternative)
+
+We also provide **automated setup scripts** for all platforms that install everything and launch the app automatically:
 
 #### **Windows (Batch Script)**
 
@@ -1274,7 +1299,7 @@ Future features planned:
 
 ## 📝 Changelog
 
-### Version 2.0.0 (November 2025) - Major Update 🎉
+### Version 1.0.0 (January 2026)
 
 - ✅ **Persistent Chat Sessions** - MongoDB-backed session management
 - ✅ **ChatGPT-Style Interface** - Session history sidebar with time-based grouping
@@ -1288,8 +1313,8 @@ Future features planned:
 - ✅ **Async Title Generation** - Non-blocking title creation
 - ✅ **Session CRUD API** - Full REST API for session management
 - ✅ **Database Indexes** - Optimized queries for sessions and files
-
-### Version 1.0.0 (October 2025)
+- ✅ **Docker Support** - One-command deployment with docker-compose
+- ✅ **npm Package** - Published to npm as @lebiraja/plugintool
 
 - ✅ Interactive model selector with auto-fetch
 - ✅ Conversation memory (last 10 messages)
