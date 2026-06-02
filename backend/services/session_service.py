@@ -94,54 +94,30 @@ class SessionService:
     async def add_message(
         self, session_id: str, message: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Add a message to a session"""
+        """Add a message and update all derived metadata in a single DB write."""
         message["message_id"] = str(uuid4())
         message["timestamp"] = datetime.utcnow()
 
-        # Update session
+        set_fields: Dict[str, Any] = {"updated_at": datetime.utcnow()}
+        inc_fields: Dict[str, Any] = {"metadata.total_messages": 1}
+
+        if message["role"] == "assistant":
+            set_fields["metadata.last_message_preview"] = message["content"][:100]
+
+        if message.get("tokens"):
+            inc_fields["metadata.total_tokens"] = message["tokens"].get("total", 0)
+
+        tools = message.get("tools_used") or {}
+        for tool in ("web_search", "rag", "deep_research"):
+            if tools.get(tool):
+                inc_fields[f"metadata.tools_usage_count.{tool}"] = 1
+
         result = await db_service.sessions.update_one(
             {"session_id": session_id},
-            {
-                "$push": {"messages": message},
-                "$set": {"updated_at": datetime.utcnow()},
-                "$inc": {"metadata.total_messages": 1},
-            },
+            {"$push": {"messages": message}, "$set": set_fields, "$inc": inc_fields},
         )
-
         if result.modified_count == 0:
             raise ValueError(f"Session {session_id} not found")
-
-        # Update last message preview for assistant messages
-        if message["role"] == "assistant":
-            preview = message["content"][:100]
-            await db_service.sessions.update_one(
-                {"session_id": session_id},
-                {"$set": {"metadata.last_message_preview": preview}},
-            )
-
-        # Update token count if present
-        if message.get("tokens"):
-            total_tokens = message["tokens"].get("total", 0)
-            await db_service.sessions.update_one(
-                {"session_id": session_id},
-                {"$inc": {"metadata.total_tokens": total_tokens}},
-            )
-
-        # Update tool usage count
-        if message.get("tools_used"):
-            tools = message["tools_used"]
-            update_dict = {}
-            if tools.get("web_search"):
-                update_dict["metadata.tools_usage_count.web_search"] = 1
-            if tools.get("rag"):
-                update_dict["metadata.tools_usage_count.rag"] = 1
-            if tools.get("deep_research"):
-                update_dict["metadata.tools_usage_count.deep_research"] = 1
-
-            if update_dict:
-                await db_service.sessions.update_one(
-                    {"session_id": session_id}, {"$inc": update_dict}
-                )
 
         return message
 
@@ -149,13 +125,26 @@ class SessionService:
         self,
         session_id: str,
         user_message: str,
-        assistant_response: str,
-        backend: str,
-        model: str,
+        assistant_response: str = "",
+        backend: Optional[str] = None,
+        model: Optional[str] = None,
     ) -> str:
-        """Auto-generate session title from first message exchange"""
+        """
+        Auto-generate a session title.
+
+        ``backend``/``model`` are optional: when omitted (e.g. the manual
+        generate-title endpoint passes only the user message) they are read from
+        the session's stored model_config, so both call sites work with one
+        signature.
+        """
         try:
-            # Create prompt that analyzes both user question and assistant response
+            if backend is None or model is None:
+                session = await self.get_session(session_id)
+                if not session:
+                    raise ValueError(f"Session {session_id} not found")
+                backend = backend or session["model_config"]["backend"]
+                model = model or session["model_config"]["model"]
+
             prompt = f"""Based on this conversation exchange, create a concise title using EXACTLY 3-4 words.
 
 User: {user_message}
@@ -221,8 +210,8 @@ Title (3-4 words only):"""
 
     async def add_file_to_session(
         self, session_id: str, file_metadata: Dict[str, Any]
-    ) -> bool:
-        """Add file metadata to session"""
+    ) -> Optional[Dict[str, Any]]:
+        """Add file metadata to a session; return the stored record (with file_id)."""
         file_metadata["file_id"] = str(uuid4())
         file_metadata["uploaded_at"] = datetime.utcnow()
 
@@ -233,7 +222,7 @@ Title (3-4 words only):"""
                 "$set": {"updated_at": datetime.utcnow()},
             },
         )
-        return result.modified_count > 0
+        return file_metadata if result.modified_count > 0 else None
 
     async def update_file_metadata(
         self, session_id: str, file_id: str, updates: Dict[str, Any]
