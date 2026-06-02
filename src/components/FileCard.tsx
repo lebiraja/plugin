@@ -22,15 +22,15 @@ const FileCard: React.FC<FileCardProps> = ({
     if (!type) return <File className="w-5 h-5 text-gray-400" />;
 
     if (type.includes("pdf"))
-      return <FileText className="w-5 h-5 text-accent-red" />;
+      return <FileText className="w-5 h-5 text-apple-red" />;
     if (type.includes("image"))
       return <Image className="w-5 h-5 text-primary" />;
     if (type.includes("video"))
-      return <Video className="w-5 h-5 text-accent-purple" />;
+      return <Video className="w-5 h-5 text-apple-purple" />;
     if (type.includes("audio"))
-      return <Music className="w-5 h-5 text-accent-green" />;
+      return <Music className="w-5 h-5 text-apple-green" />;
     if (type.includes("zip") || type.includes("rar"))
-      return <Archive className="w-5 h-5 text-accent-yellow" />;
+      return <Archive className="w-5 h-5 text-apple-yellow" />;
     if (type.includes("text"))
       return <FileText className="w-5 h-5 text-gray-400" />;
 
@@ -95,10 +95,10 @@ const FileCard: React.FC<FileCardProps> = ({
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           onClick={onRemove}
-          className="flex-shrink-0 p-1.5 hover:bg-accent-red/20 rounded-lg transition-colors"
+          className="flex-shrink-0 p-1.5 hover:bg-apple-red/20 rounded-lg transition-colors"
           title="Remove file"
         >
-          <X className="w-4 h-4 text-accent-red" />
+          <X className="w-4 h-4 text-apple-red" />
         </motion.button>
       )}
     </motion.div>

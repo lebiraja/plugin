@@ -290,17 +290,17 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handleRename(session.session_id)}
-                    className="p-1.5 hover:bg-accent-green/20 rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-apple-green/20 rounded-lg transition-colors"
                   >
-                    <Check className="w-4 h-4 text-accent-green" />
+                    <Check className="w-4 h-4 text-apple-green" />
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={cancelRename}
-                    className="p-1.5 hover:bg-accent-red/20 rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-apple-red/20 rounded-lg transition-colors"
                   >
-                    <X className="w-4 h-4 text-accent-red" />
+                    <X className="w-4 h-4 text-apple-red" />
                   </motion.button>
                 </div>
               ) : (
@@ -341,9 +341,9 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
                         onClick={(e) =>
                           handleDeleteSession(session.session_id, e)
                         }
-                        className="p-1.5 hover:bg-accent-red/20 rounded-lg transition-colors"
+                        className="p-1.5 hover:bg-apple-red/20 rounded-lg transition-colors"
                       >
-                        <Trash2 className="w-3.5 h-3.5 text-accent-red" />
+                        <Trash2 className="w-3.5 h-3.5 text-apple-red" />
                       </motion.button>
                     </div>
                   </div>

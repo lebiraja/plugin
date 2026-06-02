@@ -132,13 +132,13 @@ function MessageBubble({ message, index }: { message: Message; index: number }) 
           )}
           {message.latency && (
             <span className="flex items-center gap-1">
-              <span className="w-1 h-1 rounded-full bg-accent-green" />
+              <span className="w-1 h-1 rounded-full bg-apple-green" />
               {message.latency}ms
             </span>
           )}
           {message.model && (
             <span className="flex items-center gap-1">
-              <span className="w-1 h-1 rounded-full bg-accent-cyan" />
+              <span className="w-1 h-1 rounded-full bg-apple-cyan" />
               {message.model}
             </span>
           )}

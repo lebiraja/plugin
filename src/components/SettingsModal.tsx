@@ -241,7 +241,7 @@ function BackendsSettings() {
         <div key={backend.id} className="stat-card">
           <div className="flex items-center justify-between mb-2">
             <div className="font-medium text-gray-200">{backend.name}</div>
-            <div className={`w-2.5 h-2.5 rounded-full ${backend.isActive ? 'bg-accent-green shadow-glow' : 'bg-gray-600'}`} />
+            <div className={`w-2.5 h-2.5 rounded-full ${backend.isActive ? 'bg-apple-green shadow-glow' : 'bg-gray-600'}`} />
           </div>
           <div className="text-sm text-gray-500">{backend.url}</div>
           <div className="text-xs text-gray-600 mt-1">{backend.type}</div>

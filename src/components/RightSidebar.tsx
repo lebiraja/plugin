@@ -227,13 +227,13 @@ function FilesPanel() {
                 <button
                   onClick={() => handleDeleteFile(file.id)}
                   disabled={deletingFile === file.id}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-accent-red/20 rounded-lg transition-all disabled:opacity-50"
+                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-apple-red/20 rounded-lg transition-all disabled:opacity-50"
                   title="Delete file"
                 >
                   {deletingFile === file.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-accent-red" />
+                    <Loader2 className="w-4 h-4 animate-spin text-apple-red" />
                   ) : (
-                    <Trash2 className="w-4 h-4 text-accent-red" />
+                    <Trash2 className="w-4 h-4 text-apple-red" />
                   )}
                 </button>
               </div>

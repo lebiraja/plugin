@@ -4,8 +4,47 @@ export default {
   darkMode: "class",
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["Geist", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["Geist Mono", "ui-monospace", "monospace"],
+        display: ["Instrument Serif", "ui-serif", "Georgia", "serif"],
+      },
       colors: {
-        // Apple Liquid Glass - Deep dark base colors
+        // shadcn-native semantic tokens (CSS variables defined in index.css)
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        // Apple Liquid Glass - Deep dark base colors (legacy)
         dark: {
           950: "#050507",
           900: "#0a0a0e",
@@ -15,8 +54,9 @@ export default {
           600: "#26272f",
           500: "#32343d",
         },
-        // Apple-style accent colors
-        accent: {
+        // Apple-style accent colors (legacy; renamed to avoid clashing with the
+        // shadcn semantic `accent` token above)
+        apple: {
           blue: "#0A84FF",
           indigo: "#5E5CE6",
           purple: "#BF5AF2",
@@ -51,14 +91,6 @@ export default {
           // Specular highlights for glass reflections
           specular: "rgba(255, 255, 255, 0.15)",
           "specular-strong": "rgba(255, 255, 255, 0.25)",
-        },
-        // Primary accent (Apple Blue)
-        primary: {
-          DEFAULT: "#0A84FF",
-          dark: "#0066CC",
-          light: "#409CFF",
-          muted: "rgba(10, 132, 255, 0.15)",
-          glow: "rgba(10, 132, 255, 0.35)",
         },
       },
       backdropBlur: {
@@ -221,6 +253,11 @@ export default {
         "inner-glow": "inset 0 0 12px rgba(10, 132, 255, 0.15)",
       },
       borderRadius: {
+        // shadcn radius scale, driven by --radius
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+        // legacy fixed radii
         "2xl": "16px",
         "3xl": "20px",
         "4xl": "28px",
@@ -246,5 +283,5 @@ export default {
       },
     },
   },
-  plugins: [require("@tailwindcss/typography")],
+  plugins: [require("@tailwindcss/typography"), require("tailwindcss-animate")],
 };

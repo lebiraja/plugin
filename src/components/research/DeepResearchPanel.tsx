@@ -93,9 +93,9 @@ export const DeepResearchPanel: React.FC = () => {
       case "synthesizing":
         return <Lightbulb className="w-5 h-5 text-gray-400 animate-pulse" />;
       case "complete":
-        return <CheckCircle2 className="w-5 h-5 text-accent-green" />;
+        return <CheckCircle2 className="w-5 h-5 text-apple-green" />;
       case "error":
-        return <AlertCircle className="w-5 h-5 text-accent-red" />;
+        return <AlertCircle className="w-5 h-5 text-apple-red" />;
       default:
         return <Search className="w-5 h-5 text-gray-500" />;
     }
@@ -225,9 +225,9 @@ export const DeepResearchPanel: React.FC = () => {
               <div
                 className={`liquid-progress-fill ${
                   progress.stage === "error"
-                    ? "!bg-accent-red"
+                    ? "!bg-apple-red"
                     : progress.stage === "complete"
-                    ? "!bg-accent-green"
+                    ? "!bg-apple-green"
                     : ""
                 }`}
                 style={{ width: `${progress.progress}%` }}
@@ -253,7 +253,7 @@ export const DeepResearchPanel: React.FC = () => {
                     isActive
                       ? "bg-primary/20 text-primary border border-primary/30"
                       : isComplete
-                      ? "bg-accent-green/10 text-accent-green border border-accent-green/20"
+                      ? "bg-apple-green/10 text-apple-green border border-apple-green/20"
                       : "bg-liquid-frosted border border-liquid-border text-gray-500"
                   }`}
                 >
@@ -267,11 +267,11 @@ export const DeepResearchPanel: React.FC = () => {
 
       {/* Error Display */}
       {error && (
-        <div className="p-4 rounded-2xl bg-accent-red/10 border border-accent-red/30 flex items-start space-x-3">
-          <AlertCircle className="w-5 h-5 text-accent-red flex-shrink-0 mt-0.5" />
+        <div className="p-4 rounded-2xl bg-apple-red/10 border border-apple-red/30 flex items-start space-x-3">
+          <AlertCircle className="w-5 h-5 text-apple-red flex-shrink-0 mt-0.5" />
           <div>
-            <h4 className="font-medium text-accent-red">Research Failed</h4>
-            <p className="text-sm text-accent-red/80 mt-1">{error}</p>
+            <h4 className="font-medium text-apple-red">Research Failed</h4>
+            <p className="text-sm text-apple-red/80 mt-1">{error}</p>
           </div>
         </div>
       )}
@@ -292,7 +292,7 @@ export const DeepResearchPanel: React.FC = () => {
             <div className="text-xs text-gray-500">Insights</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-accent-green">
+            <div className="text-2xl font-bold text-apple-green">
               {currentResearch.metadata.time_taken.toFixed(1)}s
             </div>
             <div className="text-xs text-gray-500">Time</div>
