@@ -6,38 +6,35 @@ import type {
   ModelConfig,
   ToolsConfig,
 } from "../types";
+import { providerApi, type Provider } from "../api/providers";
 
 interface SettingsStore {
   settings: AppSettings;
-  updateBackend: (backend: LLMBackend) => void;
+  /** Enabled providers fetched from the backend (source of truth; not persisted). */
+  providers: Provider[];
+  encryptionAvailable: boolean;
   setActiveBackend: (backendId: string) => void;
   setActiveModel: (model: string) => void;
   updateModelConfig: (config: Partial<ModelConfig>) => void;
   updateToolsConfig: (config: Partial<ToolsConfig>) => void;
   setConversationMode: (mode: string) => void;
-  addBackend: (backend: LLMBackend) => void;
-  removeBackend: (backendId: string) => void;
+  fetchProviders: () => Promise<void>;
+}
+
+function providerToBackend(p: Provider): LLMBackend {
+  return {
+    id: p.id,
+    name: p.name,
+    type: p.local ? (p.protocol === "ollama" ? "ollama" : "lmstudio") : "custom",
+    url: p.base_url,
+    models: p.default_models,
+    isActive: p.enabled,
+  };
 }
 
 const defaultSettings: AppSettings = {
-  backends: [
-    {
-      id: "ollama-default",
-      name: "Ollama",
-      type: "ollama",
-      url: "http://localhost:11434",
-      models: [],
-      isActive: true,
-    },
-    {
-      id: "lmstudio-default",
-      name: "LM Studio",
-      type: "lmstudio",
-      url: "http://localhost:1234",
-      models: [],
-      isActive: false,
-    },
-  ],
+  // Populated from the backend via fetchProviders(); empty until then.
+  backends: [],
   activeBackend: "ollama-default",
   activeModel: "",
   modelConfig: {
@@ -61,41 +58,43 @@ export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
       settings: defaultSettings,
+      providers: [],
+      encryptionAvailable: false,
 
-      updateBackend: (backend) =>
-        set((state) => ({
-          settings: {
-            ...state.settings,
-            backends: state.settings.backends.map((b) =>
-              b.id === backend.id ? backend : b
-            ),
-          },
-        })),
+      fetchProviders: async () => {
+        try {
+          const { providers, encryption_available } = await providerApi.list();
+          const enabled = providers.filter((p) => p.enabled);
+          set((state) => ({
+            providers,
+            encryptionAvailable: encryption_available,
+            settings: {
+              ...state.settings,
+              backends: enabled.map(providerToBackend),
+              // Keep the active backend valid; fall back to the first enabled one.
+              activeBackend: enabled.some((p) => p.id === state.settings.activeBackend)
+                ? state.settings.activeBackend
+                : enabled[0]?.id || state.settings.activeBackend,
+            },
+          }));
+        } catch {
+          /* leave existing state; BackendStatusBanner surfaces connectivity */
+        }
+      },
 
       setActiveBackend: (backendId) =>
         set((state) => ({
-          settings: {
-            ...state.settings,
-            activeBackend: backendId,
-          },
+          settings: { ...state.settings, activeBackend: backendId },
         })),
 
       setActiveModel: (model) =>
-        set((state) => ({
-          settings: {
-            ...state.settings,
-            activeModel: model,
-          },
-        })),
+        set((state) => ({ settings: { ...state.settings, activeModel: model } })),
 
       updateModelConfig: (config) =>
         set((state) => ({
           settings: {
             ...state.settings,
-            modelConfig: {
-              ...state.settings.modelConfig,
-              ...config,
-            },
+            modelConfig: { ...state.settings.modelConfig, ...config },
           },
         })),
 
@@ -103,39 +102,24 @@ export const useSettingsStore = create<SettingsStore>()(
         set((state) => ({
           settings: {
             ...state.settings,
-            toolsConfig: {
-              ...state.settings.toolsConfig,
-              ...config,
-            },
+            toolsConfig: { ...state.settings.toolsConfig, ...config },
           },
         })),
 
       setConversationMode: (mode) =>
         set((state) => ({
-          settings: {
-            ...state.settings,
-            conversationMode: mode,
-          },
-        })),
-
-      addBackend: (backend) =>
-        set((state) => ({
-          settings: {
-            ...state.settings,
-            backends: [...state.settings.backends, backend],
-          },
-        })),
-
-      removeBackend: (backendId) =>
-        set((state) => ({
-          settings: {
-            ...state.settings,
-            backends: state.settings.backends.filter((b) => b.id !== backendId),
-          },
+          settings: { ...state.settings, conversationMode: mode },
         })),
     }),
     {
       name: "llm-chat-settings",
+      // Persist only user preferences — NEVER providers or any API key material.
+      partialize: (state) => ({
+        settings: {
+          ...state.settings,
+          backends: [],
+        },
+      }),
     }
   )
 );

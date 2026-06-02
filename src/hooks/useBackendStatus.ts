@@ -5,10 +5,8 @@ interface BackendStatus {
   isOnline: boolean;
   isChecking: boolean;
   lastChecked: Date | null;
-  backends: {
-    ollama: boolean;
-    lmstudio: boolean;
-  };
+  /** Dynamic per-provider availability map (keys are provider ids). */
+  backends: Record<string, boolean>;
 }
 
 export function useBackendStatus(checkInterval = 10000) {
@@ -16,10 +14,7 @@ export function useBackendStatus(checkInterval = 10000) {
     isOnline: true,
     isChecking: false,
     lastChecked: null,
-    backends: {
-      ollama: false,
-      lmstudio: false,
-    },
+    backends: {},
   });
 
   useEffect(() => {
@@ -40,14 +35,14 @@ export function useBackendStatus(checkInterval = 10000) {
           isOnline: true,
           isChecking: false,
           lastChecked: new Date(),
-          backends: data.backends || { ollama: false, lmstudio: false },
+          backends: data.backends || {},
         });
       } catch (error) {
         setStatus({
           isOnline: false,
           isChecking: false,
           lastChecked: new Date(),
-          backends: { ollama: false, lmstudio: false },
+          backends: {},
         });
       }
     };

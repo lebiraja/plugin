@@ -17,9 +17,9 @@ export function BackendStatusBanner() {
               Backend Connection Lost
             </p>
             <p className="text-white/80 text-xs">
-              {!backends.ollama && !backends.lmstudio
-                ? "No LLM backends available. Please start Ollama or LM Studio."
-                : "Reconnecting..."}
+              {Object.values(backends).some(Boolean)
+                ? "Reconnecting..."
+                : "No LLM providers available. Start a local backend or add a provider in Settings."}
             </p>
           </div>
         </div>

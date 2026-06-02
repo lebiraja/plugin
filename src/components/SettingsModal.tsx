@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
+import { Loader2, Plus, Trash2, CheckCircle2, XCircle, KeyRound } from "lucide-react";
 import { useSettingsStore } from "../store/settingsStore";
+import { providerApi, type Provider } from "../api/providers";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +13,8 @@ import { Slider } from "./ui/slider";
 import { Switch } from "./ui/switch";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
 import { cn } from "@/lib/utils";
 
 interface SettingsModalProps {
@@ -28,7 +33,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="model">Model</TabsTrigger>
             <TabsTrigger value="tools">Tools</TabsTrigger>
-            <TabsTrigger value="backends">Backends</TabsTrigger>
+            <TabsTrigger value="providers">Providers</TabsTrigger>
           </TabsList>
           <TabsContent value="model" className="pt-2">
             <ModelSettings />
@@ -36,8 +41,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <TabsContent value="tools" className="pt-2">
             <ToolsSettings />
           </TabsContent>
-          <TabsContent value="backends" className="pt-2">
-            <BackendsSettings />
+          <TabsContent value="providers" className="pt-2">
+            <ProvidersSettings />
           </TabsContent>
         </Tabs>
       </DialogContent>
@@ -133,22 +138,200 @@ function ToolsSettings() {
   );
 }
 
-function BackendsSettings() {
-  const { settings } = useSettingsStore();
+function ProvidersSettings() {
+  const { fetchProviders } = useSettingsStore();
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [encryptionAvailable, setEncryptionAvailable] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [keyInput, setKeyInput] = useState("");
+  const [baseUrlInput, setBaseUrlInput] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<Record<string, boolean>>({});
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { providers, encryption_available } = await providerApi.list();
+      setProviders(providers);
+      setEncryptionAvailable(encryption_available);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const save = async (p: Provider) => {
+    setBusy(p.id);
+    try {
+      await providerApi.upsert({
+        id: p.id,
+        base_url: p.id === "custom" ? baseUrlInput || p.base_url : undefined,
+        api_key: keyInput || undefined,
+        enabled: true,
+      });
+      setEditing(null);
+      setKeyInput("");
+      setBaseUrlInput("");
+      await load();
+      await fetchProviders();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const toggle = async (p: Provider, enabled: boolean) => {
+    setBusy(p.id);
+    try {
+      await providerApi.upsert({ id: p.id, enabled });
+      await load();
+      await fetchProviders();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const test = async (p: Provider) => {
+    setBusy(p.id);
+    try {
+      const r = await providerApi.test(p.id);
+      setTestResult((prev) => ({ ...prev, [p.id]: r.ok }));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const remove = async (p: Provider) => {
+    if (!confirm(`Remove ${p.name}?`)) return;
+    setBusy(p.id);
+    try {
+      await providerApi.remove(p.id);
+      await load();
+      await fetchProviders();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-10">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2 py-2">
-      {settings.backends.map((backend) => (
-        <div key={backend.id} className="rounded-lg border border-border p-4">
-          <div className="mb-1 flex items-center justify-between">
-            <span className="text-sm font-medium">{backend.name}</span>
-            <span
-              className={cn(
-                "h-2.5 w-2.5 rounded-full",
-                backend.isActive ? "bg-emerald-400" : "bg-muted-foreground/40"
+      {!encryptionAvailable && (
+        <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
+          <KeyRound className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Set <code className="font-mono">ENCRYPTION_KEY</code> on the server to
+            add API keys for cloud providers.
+          </span>
+        </div>
+      )}
+      {providers.map((p) => (
+        <div key={p.id} className="rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">{p.name}</span>
+                {p.local && <Badge variant="secondary">local</Badge>}
+                {p.has_key && (
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {p.masked_key}
+                  </span>
+                )}
+                {testResult[p.id] === true && (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                )}
+                {testResult[p.id] === false && (
+                  <XCircle className="h-4 w-4 text-destructive" />
+                )}
+              </div>
+              <div className="truncate font-mono text-xs text-muted-foreground">
+                {p.base_url || "no base URL"}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <Switch
+                checked={p.enabled}
+                disabled={busy === p.id}
+                onCheckedChange={(v) => toggle(p, v)}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={busy === p.id}
+                onClick={() => test(p)}
+              >
+                {busy === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Test"}
+              </Button>
+              {!p.local && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => remove(p)}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
               )}
-            />
+            </div>
           </div>
-          <div className="font-mono text-xs text-muted-foreground">{backend.url}</div>
+
+          {(p.requires_key || p.id === "custom") && (
+            <div className="mt-3">
+              {editing === p.id ? (
+                <div className="space-y-2">
+                  {p.id === "custom" && (
+                    <Input
+                      placeholder="Base URL (e.g. https://api.example.com/v1)"
+                      value={baseUrlInput}
+                      onChange={(e) => setBaseUrlInput(e.target.value)}
+                    />
+                  )}
+                  <div className="flex gap-2">
+                    <Input
+                      type="password"
+                      placeholder="Paste API key"
+                      value={keyInput}
+                      disabled={!encryptionAvailable}
+                      onChange={(e) => setKeyInput(e.target.value)}
+                    />
+                    <Button size="sm" disabled={busy === p.id} onClick={() => save(p)}>
+                      Save
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditing(null);
+                        setKeyInput("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!encryptionAvailable && p.requires_key}
+                  onClick={() => setEditing(p.id)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {p.has_key ? "Update key" : "Add API key"}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       ))}
     </div>
