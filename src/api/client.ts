@@ -68,9 +68,6 @@ apiClient.interceptors.response.use(
       const delay = RETRY_DELAY * Math.pow(2, config._retry - 1);
       await new Promise((resolve) => setTimeout(resolve, delay));
 
-      console.log(
-        `Retrying request (attempt ${config._retry}/${MAX_RETRIES})...`
-      );
       return apiClient(config);
     }
 
