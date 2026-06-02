@@ -58,8 +58,13 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
     renameSession,
     isLoadingSessions,
   } = useSessionStore();
-  const { settings, setActiveBackend, setActiveModel, updateToolsConfig } =
-    useSettingsStore();
+  const {
+    settings,
+    setActiveBackend,
+    setActiveModel,
+    updateToolsConfig,
+    fetchProviders,
+  } = useSettingsStore();
   const navigate = useNavigate();
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -96,7 +101,8 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
 
   useEffect(() => {
     fetchSessions();
-  }, [fetchSessions]);
+    fetchProviders();
+  }, [fetchSessions, fetchProviders]);
 
   const fetchModels = useCallback(async () => {
     if (!settings.activeBackend) return;

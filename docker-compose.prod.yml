@@ -1,0 +1,99 @@
+# Production compose: runs the published GHCR images instead of building locally.
+#
+#   IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
+#
+# Provide a .env with at least ENCRYPTION_KEY (to enable cloud providers) and any
+# bootstrap provider keys. Override GHCR_OWNER if your images live elsewhere.
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-server
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - app-network
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb-server
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-password}
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
+
+  backend:
+    image: ghcr.io/${GHCR_OWNER:-lebiraja}/plugin-backend:${IMAGE_TAG:-latest}
+    container_name: backend-server
+    ports:
+      - "2000:2000"
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_vector_db:/app/vector_db
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - OLLAMA_URL=http://ollama:11434
+      - MONGODB_URL=mongodb://admin:${MONGO_PASSWORD:-password}@mongodb:27017/
+      - MONGODB_DB_NAME=plugin_chat_db
+      - VECTOR_DB_PATH=/app/vector_db
+      - UPLOAD_DIR=/app/uploads
+      - CORS_ORIGINS=http://localhost:3100
+    depends_on:
+      ollama:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    image: ghcr.io/${GHCR_OWNER:-lebiraja}/plugin-frontend:${IMAGE_TAG:-latest}
+    container_name: frontend-server
+    ports:
+      - "3100:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/", "-o", "/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  ollama_data:
+  mongodb_data:
+  backend_uploads:
+  backend_vector_db:
+
+networks:
+  app-network:
+    driver: bridge

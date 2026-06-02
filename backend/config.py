@@ -37,6 +37,25 @@ class Settings(BaseSettings):
         default="", validation_alias=AliasChoices("SERPER_API_KEY")
     )
 
+    # Fernet key used to encrypt provider API keys at rest. When unset, adding a
+    # cloud provider that requires a key is rejected (local providers still work).
+    encryption_key: str = Field(
+        default="", validation_alias=AliasChoices("ENCRYPTION_KEY")
+    )
+
+    # Optional bootstrap provider keys: if set, they are seeded (encrypted) into
+    # the providers collection on first startup so a deploy can ship with cloud
+    # access pre-configured.
+    openai_api_key: str = Field(
+        default="", validation_alias=AliasChoices("OPENAI_API_KEY")
+    )
+    openrouter_api_key: str = Field(
+        default="", validation_alias=AliasChoices("OPENROUTER_API_KEY")
+    )
+    groq_api_key: str = Field(
+        default="", validation_alias=AliasChoices("GROQ_API_KEY")
+    )
+
     # Vector Database
     vector_db_path: str = Field(
         default="./vector_db", validation_alias=AliasChoices("VECTOR_DB_PATH")

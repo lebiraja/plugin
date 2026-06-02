@@ -8,7 +8,7 @@ from uuid import uuid4
 import logging
 
 from services.database_service import db_service
-from services.llm_service import LLMService
+from services.llm_service import LLMService, _default_llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class SessionService:
     """Service for managing chat sessions in MongoDB"""
 
     def __init__(self, llm_service: Optional[LLMService] = None):
-        self.llm_service = llm_service or LLMService()
+        self.llm_service = llm_service or _default_llm_service()
 
     async def create_session(
         self, backend: str, model: str, config: Dict[str, Any]

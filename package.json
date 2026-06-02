@@ -1,59 +1,22 @@
 {
-  "name": "@lebiraja/plugintool",
-  "version": "1.0.0",
+  "name": "plugin-chat",
+  "version": "2.0.0",
   "type": "module",
-  "description": "Modern local LLM chat interface with Apple-inspired UI - React components for building AI chat applications",
-  "private": false,
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./styles.css": "./dist/styles.css"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
+  "description": "Self-hosted multi-provider LLM chat app (local Ollama/LM Studio + cloud providers), shipped as Docker containers",
+  "private": true,
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lebiraja/plugin.git"
   },
-  "author": "lebiraja",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/lebiraja/plugin/issues"
-  },
-  "homepage": "https://github.com/lebiraja/plugin#readme",
-  "keywords": [
-    "llm",
-    "chat",
-    "react",
-    "ai",
-    "ollama",
-    "lmstudio",
-    "chatbot",
-    "local-llm",
-    "ui-components"
-  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:lib": "vite build --mode lib",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "backend": "cd backend && uvicorn main:app --reload --host 0.0.0.0 --port 2000",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "prepublishOnly": "npm run build:lib"
-  },
-  "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -103,7 +66,6 @@
     "tailwindcss": "^3.4.0",
     "typescript": "^5.5.0",
     "vite": "^5.4.0",
-    "vite-plugin-dts": "^4.5.4",
     "vitest": "^4.1.8"
   }
 }

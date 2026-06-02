@@ -19,7 +19,7 @@ import hashlib
 import json
 import logging
 
-from services.llm_service import LLMService
+from services.llm_service import LLMService, _default_llm_service
 from services.search_service import SearchService
 
 logger = logging.getLogger(__name__)
@@ -142,7 +142,7 @@ class DeepResearchService:
         search_service: Optional[SearchService] = None,
         db_service=None,
     ):
-        self.llm_service = llm_service or LLMService()
+        self.llm_service = llm_service or _default_llm_service()
         self.search_service = search_service or SearchService()
         self.db_service = db_service
 
