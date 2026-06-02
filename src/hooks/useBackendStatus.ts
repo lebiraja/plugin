@@ -29,8 +29,10 @@ export function useBackendStatus(checkInterval = 10000) {
       try {
         const response = await apiClient.get("/health", {
           timeout: 5000,
-          _retry: 0, // Disable retries for health checks
-        } as any);
+          // Disable retries for health checks (custom field read by the client
+          // interceptor); cast through unknown to satisfy the axios config type.
+          _retry: 0,
+        } as unknown as Parameters<typeof apiClient.get>[1]);
 
         const data = response.data;
 

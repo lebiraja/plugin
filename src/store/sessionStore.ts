@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { sessionApi, Session, SessionDetail } from "../api/sessions";
+import {
+  sessionApi,
+  Session,
+  SessionDetail,
+  SessionModelConfig,
+} from "../api/sessions";
 
 interface SessionStore {
   sessions: Session[];
@@ -15,7 +20,7 @@ interface SessionStore {
   createSession: (
     backend: string,
     model: string,
-    config?: any
+    config?: SessionModelConfig
   ) => Promise<string>;
   loadSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
@@ -46,7 +51,7 @@ export const useSessionStore = create<SessionStore>()(
         }
       },
 
-      createSession: async (backend: string, model: string, config?: any) => {
+      createSession: async (backend: string, model: string, config?: SessionModelConfig) => {
         set({ error: null });
         try {
           const result = await sessionApi.createSession({
