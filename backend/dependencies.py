@@ -18,6 +18,7 @@ from services import db_service
 from services.llm_service import LLMService
 from services.provider_service import ProviderService
 from services.search_service import SearchService
+from services.secret_service import SecretService
 from services.session_service import SessionService
 
 if TYPE_CHECKING:
@@ -31,13 +32,18 @@ def get_provider_service() -> ProviderService:
 
 
 @lru_cache(maxsize=1)
+def get_secret_service() -> SecretService:
+    return SecretService(db_service)
+
+
+@lru_cache(maxsize=1)
 def get_llm_service() -> LLMService:
     return LLMService(provider_service=get_provider_service())
 
 
 @lru_cache(maxsize=1)
 def get_search_service() -> SearchService:
-    return SearchService()
+    return SearchService(secret_service=get_secret_service())
 
 
 def get_rag_service() -> "RAGService":

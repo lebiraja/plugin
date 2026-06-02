@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { Loader2, Plus, Trash2, CheckCircle2, XCircle, KeyRound } from "lucide-react";
 import { useSettingsStore } from "../store/settingsStore";
 import { providerApi, type Provider } from "../api/providers";
+import { integrationsApi, type SearchIntegration } from "../api/integrations";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "./ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { Slider } from "./ui/slider";
@@ -28,12 +30,16 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">Settings</DialogTitle>
+          <DialogDescription className="sr-only">
+            Configure the model, tools, LLM providers, and web search.
+          </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="model" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="model">Model</TabsTrigger>
             <TabsTrigger value="tools">Tools</TabsTrigger>
             <TabsTrigger value="providers">Providers</TabsTrigger>
+            <TabsTrigger value="search">Search</TabsTrigger>
           </TabsList>
           <TabsContent value="model" className="pt-2">
             <ModelSettings />
@@ -43,6 +49,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </TabsContent>
           <TabsContent value="providers" className="pt-2">
             <ProvidersSettings />
+          </TabsContent>
+          <TabsContent value="search" className="pt-2">
+            <SearchSettings />
           </TabsContent>
         </Tabs>
       </DialogContent>
@@ -334,6 +343,152 @@ function ProvidersSettings() {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function SearchSettings() {
+  const [integration, setIntegration] = useState<SearchIntegration | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [tested, setTested] = useState<boolean | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      setIntegration(await integrationsApi.getSearch());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const save = async () => {
+    if (!keyInput) return;
+    setBusy(true);
+    try {
+      await integrationsApi.setSearchKey(keyInput);
+      setEditing(false);
+      setKeyInput("");
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const test = async () => {
+    setBusy(true);
+    try {
+      const r = await integrationsApi.testSearch();
+      setTested(r.ok);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!confirm("Remove the Serper API key? Search will fall back to DuckDuckGo.")) return;
+    setBusy(true);
+    try {
+      await integrationsApi.deleteSearchKey();
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading || !integration) {
+    return (
+      <div className="flex justify-center py-10">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 py-2">
+      {!integration.encryption_available && (
+        <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
+          <KeyRound className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Set <code className="font-mono">ENCRYPTION_KEY</code> on the server to
+            store a search API key.
+          </span>
+        </div>
+      )}
+      <div className="rounded-lg border border-border p-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">{integration.name}</span>
+              {integration.has_value && (
+                <span className="font-mono text-xs text-muted-foreground">
+                  {integration.masked_value}
+                </span>
+              )}
+              {tested === true && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
+              {tested === false && <XCircle className="h-4 w-4 text-destructive" />}
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Premium web search. Without a key, search uses DuckDuckGo.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            {integration.has_value && (
+              <>
+                <Button variant="ghost" size="sm" disabled={busy} onClick={test}>
+                  {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Test"}
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={remove}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-3">
+          {editing ? (
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                placeholder="Paste Serper.dev API key"
+                value={keyInput}
+                disabled={!integration.encryption_available}
+                onChange={(e) => setKeyInput(e.target.value)}
+              />
+              <Button size="sm" disabled={busy} onClick={save}>
+                Save
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setEditing(false);
+                  setKeyInput("");
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!integration.encryption_available}
+              onClick={() => setEditing(true)}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {integration.has_value ? "Update key" : "Add API key"}
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

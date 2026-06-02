@@ -47,6 +47,7 @@ from routers import (  # noqa: E402
     deep_research,
     files,
     health,
+    integrations,
     models,
     providers,
     sessions,
@@ -60,9 +61,11 @@ async def lifespan(app: FastAPI):
     """Connect to MongoDB and seed bootstrap providers on startup."""
     try:
         await db_service.connect()
-        from dependencies import get_provider_service
+        from dependencies import get_provider_service, get_secret_service
+        from services.secret_service import SERPER_KEY
 
         await get_provider_service().seed_bootstrap_keys()
+        await get_secret_service().seed_bootstrap(SERPER_KEY, settings.serper_api_key)
         logger.info("Application startup complete")
     except Exception:
         logger.exception("Startup failed")
@@ -110,6 +113,9 @@ app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(files.router, prefix="/api/files", tags=["files"])
 app.include_router(models.router, prefix="/api/models", tags=["models"])
 app.include_router(providers.router, prefix="/api/providers", tags=["providers"])
+app.include_router(
+    integrations.router, prefix="/api/integrations", tags=["integrations"]
+)
 app.include_router(tools.router, prefix="/api/tools", tags=["tools"])
 app.include_router(
     deep_research.router, prefix="/api/deep-research", tags=["deep-research"]
