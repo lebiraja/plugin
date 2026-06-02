@@ -16,6 +16,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from services import db_service
 from services.llm_service import LLMService
+from services.provider_service import ProviderService
 from services.search_service import SearchService
 from services.session_service import SessionService
 
@@ -25,8 +26,13 @@ if TYPE_CHECKING:
 
 
 @lru_cache(maxsize=1)
+def get_provider_service() -> ProviderService:
+    return ProviderService(db_service)
+
+
+@lru_cache(maxsize=1)
 def get_llm_service() -> LLMService:
-    return LLMService()
+    return LLMService(provider_service=get_provider_service())
 
 
 @lru_cache(maxsize=1)

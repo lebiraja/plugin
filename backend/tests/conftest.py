@@ -17,6 +17,11 @@ from mongomock_motor import AsyncMongoMockClient
 # Keep file logging out of the way of root-owned dev dirs.
 os.environ.setdefault("LOG_DIR", "/tmp/plugin-test-logs")
 
+# A deterministic Fernet key so provider-encryption tests have crypto available.
+from cryptography.fernet import Fernet  # noqa: E402
+
+os.environ.setdefault("ENCRYPTION_KEY", Fernet.generate_key().decode())
+
 
 @pytest.fixture
 def fake_llm():
@@ -82,6 +87,15 @@ async def mock_db():
     yield db
     db_service._client = None
     db_service._db = None
+
+
+@pytest_asyncio.fixture
+async def provider_service(mock_db):
+    """A ProviderService backed by the mock DB (encryption available)."""
+    from services.database_service import db_service
+    from services.provider_service import ProviderService
+
+    return ProviderService(db_service)
 
 
 @pytest_asyncio.fixture

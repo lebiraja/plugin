@@ -48,6 +48,7 @@ from routers import (  # noqa: E402
     files,
     health,
     models,
+    providers,
     sessions,
     tools,
 )
@@ -56,9 +57,12 @@ from services.database_service import db_service  # noqa: E402
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Connect to MongoDB on startup, disconnect on shutdown."""
+    """Connect to MongoDB and seed bootstrap providers on startup."""
     try:
         await db_service.connect()
+        from dependencies import get_provider_service
+
+        await get_provider_service().seed_bootstrap_keys()
         logger.info("Application startup complete")
     except Exception:
         logger.exception("Startup failed")
@@ -105,6 +109,7 @@ app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(files.router, prefix="/api/files", tags=["files"])
 app.include_router(models.router, prefix="/api/models", tags=["models"])
+app.include_router(providers.router, prefix="/api/providers", tags=["providers"])
 app.include_router(tools.router, prefix="/api/tools", tags=["tools"])
 app.include_router(
     deep_research.router, prefix="/api/deep-research", tags=["deep-research"]

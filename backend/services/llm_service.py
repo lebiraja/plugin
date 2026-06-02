@@ -1,37 +1,41 @@
 """
-LLM service: a thin, uniform client over the supported chat backends.
+LLM service: a thin, uniform client over every supported provider.
 
-Both Ollama and LM Studio expose an OpenAI-style chat endpoint that takes a
-``messages`` array, so we build messages once and stream tokens from either.
-Backend base URLs come from :mod:`config` — never hardcoded — so the same code
-works on bare metal (localhost) and in Docker (service names).
+Providers come in two protocols: Ollama's native API and the OpenAI-compatible
+``/v1/chat/completions`` format (LM Studio, OpenAI, OpenRouter, Groq, …). We
+build messages once and stream tokens from either. The provider's base URL,
+protocol, and (decrypted) API key are resolved via ProviderService — never
+hardcoded — so the same code serves local and cloud backends.
 """
 
 import json
 import logging
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, List, Optional
 
 import httpx
 
-from config import settings
+from providers import OLLAMA, OPENAI
+
+if TYPE_CHECKING:
+    from services.provider_service import ProviderService, ResolvedProvider
 
 logger = logging.getLogger(__name__)
-
-# Backend identifiers used by the API/frontend, mapped to their config URL.
-OLLAMA_BACKEND = "ollama-default"
-LMSTUDIO_BACKEND = "lmstudio-default"
 
 DEFAULT_TIMEOUT = httpx.Timeout(120.0, connect=10.0)
 
 
 class LLMService:
-    """Stateless client for chat-completion backends."""
+    """
+    Stateless client for chat-completion backends across all providers.
 
-    def __init__(self) -> None:
-        self._backend_urls = {
-            OLLAMA_BACKEND: settings.ollama_url,
-            LMSTUDIO_BACKEND: settings.lmstudio_url,
-        }
+    Given a backend/provider id, it resolves the provider (base URL, protocol,
+    and decrypted key) via ProviderService and dispatches to the matching
+    protocol handler — ``ollama`` (native) or ``openai`` (the OpenAI-compatible
+    format used by LM Studio, OpenAI, OpenRouter, Groq, …).
+    """
+
+    def __init__(self, provider_service: "ProviderService") -> None:
+        self._providers = provider_service
 
     # ── public API ───────────────────────────────────────────────────────────
 
@@ -85,13 +89,14 @@ class LLMService:
           {"type": "done", "tokens": {"prompt", "completion", "total"}}
         """
         messages = self._build_messages(message, history, system)
+        provider = await self._providers.resolve(backend)
 
-        if backend == OLLAMA_BACKEND:
-            stream = self._ollama_stream(model, messages, config)
-        elif backend == LMSTUDIO_BACKEND:
-            stream = self._lmstudio_stream(model, messages, config)
+        if provider.protocol == OLLAMA:
+            stream = self._ollama_stream(provider, model, messages, config)
+        elif provider.protocol == OPENAI:
+            stream = self._openai_compatible_stream(provider, model, messages, config)
         else:
-            raise ValueError(f"Unsupported backend: {backend}")
+            raise LLMBackendError(f"Unsupported protocol: {provider.protocol}")
 
         async for event in stream:
             yield event
@@ -127,9 +132,13 @@ class LLMService:
     # ── Ollama (/api/chat) ───────────────────────────────────────────────────
 
     async def _ollama_stream(
-        self, model: str, messages: List[Dict[str, str]], config: Dict[str, Any]
+        self,
+        provider: "ResolvedProvider",
+        model: str,
+        messages: List[Dict[str, str]],
+        config: Dict[str, Any],
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        url = f"{self._backend_urls[OLLAMA_BACKEND]}/api/chat"
+        url = f"{provider.base_url}/api/chat"
         payload = {
             "model": model,
             "messages": messages,
@@ -163,12 +172,18 @@ class LLMService:
 
         yield self._done_event(prompt_tokens, completion_tokens)
 
-    # ── LM Studio (/v1/chat/completions, OpenAI SSE) ─────────────────────────
+    # ── OpenAI-compatible (/v1/chat/completions SSE) ─────────────────────────
+    # Covers LM Studio, OpenAI, OpenRouter, Groq, Together, DeepSeek, and any
+    # custom OpenAI-compatible endpoint. A bearer key is attached when present.
 
-    async def _lmstudio_stream(
-        self, model: str, messages: List[Dict[str, str]], config: Dict[str, Any]
+    async def _openai_compatible_stream(
+        self,
+        provider: "ResolvedProvider",
+        model: str,
+        messages: List[Dict[str, str]],
+        config: Dict[str, Any],
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        url = f"{self._backend_urls[LMSTUDIO_BACKEND]}/v1/chat/completions"
+        url = f"{provider.base_url}/chat/completions"
         opts = self._options(config)
         payload = {
             "model": model,
@@ -179,16 +194,19 @@ class LLMService:
             "stream": True,
             "stream_options": {"include_usage": True},
         }
+        headers = {}
+        if provider.api_key:
+            headers["Authorization"] = f"Bearer {provider.api_key}"
 
         prompt_tokens = 0
         completion_tokens = 0
         try:
             async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-                async with client.stream("POST", url, json=payload) as response:
+                async with client.stream("POST", url, json=payload, headers=headers) as response:
                     if response.status_code != 200:
                         body = (await response.aread()).decode(errors="replace")
                         raise LLMBackendError(
-                            f"LM Studio error ({response.status_code}): {body[:500]}"
+                            f"{provider.name} error ({response.status_code}): {body[:500]}"
                         )
                     async for line in response.aiter_lines():
                         if not line or not line.startswith("data: "):
@@ -210,8 +228,8 @@ class LLMService:
                             if chunk:
                                 yield {"type": "token", "content": chunk}
         except httpx.HTTPError as exc:
-            logger.error("LM Studio request failed: %s", exc)
-            raise LLMBackendError(f"LM Studio request failed: {exc}") from exc
+            logger.error("%s request failed: %s", provider.name, exc)
+            raise LLMBackendError(f"{provider.name} request failed: {exc}") from exc
 
         yield self._done_event(prompt_tokens, completion_tokens)
 
@@ -229,3 +247,15 @@ class LLMService:
 
 class LLMBackendError(RuntimeError):
     """Raised when an LLM backend returns an error or is unreachable."""
+
+
+def _default_llm_service() -> "LLMService":
+    """Build an LLMService backed by a default ProviderService.
+
+    Used as a fallback when a service isn't constructed through DI (direct use,
+    some tests). Production always injects the shared instance via dependencies.
+    """
+    from services import db_service
+    from services.provider_service import ProviderService
+
+    return LLMService(provider_service=ProviderService(db_service))
