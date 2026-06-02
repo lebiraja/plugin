@@ -111,11 +111,23 @@ export default function ChatInterface({
       try {
         for await (const event of streamSessionMessage(sessionId, {
           message: query,
+          backend: settings.activeBackend,
+          model: settings.activeModel,
           tools_enabled: {
             web_search: settings.toolsConfig.webSearch,
             rag: settings.toolsConfig.rag && sessionFiles.length > 0,
           },
         })) {
+          if (event.type === "error") {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId
+                  ? { ...m, content: event.detail || "Generation failed." }
+                  : m
+              )
+            );
+            break;
+          }
           if (event.type === "token" && event.content) {
             setMessages((prev) =>
               prev.map((m) =>
@@ -182,6 +194,8 @@ export default function ChatInterface({
       sessionId,
       sessionFiles.length,
       settings.toolsConfig,
+      settings.activeBackend,
+      settings.activeModel,
       setStreaming,
       updateStats,
       setCurrentContext,

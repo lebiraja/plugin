@@ -56,3 +56,40 @@ async def test_send_message_rejects_empty(client):
 async def test_missing_session_returns_404(client):
     resp = await client.get("/api/sessions/does-not-exist")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_empty_model_message_returns_422(client):
+    # Session created without a model (the real Docker bug).
+    sid = (
+        await client.post(
+            "/api/sessions/create", json={"backend": "ollama-default", "model": ""}
+        )
+    ).json()["session_id"]
+    resp = await client.post(f"/api/sessions/{sid}/message", json={"message": "hi"})
+    assert resp.status_code == 422
+    assert "model" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_request_model_override_persists(client, fake_llm):
+    fake_llm.responses.append("hello")
+    sid = (
+        await client.post(
+            "/api/sessions/create", json={"backend": "ollama-default", "model": ""}
+        )
+    ).json()["session_id"]
+
+    # Client supplies the selected model; the message should succeed and the
+    # session's model_config should be updated.
+    resp = await client.post(
+        f"/api/sessions/{sid}/message",
+        json={"message": "hi", "backend": "ollama-default", "model": "llama3"},
+    )
+    assert resp.status_code == 200
+    # Every LLM call (the response, and any background title generation) uses
+    # the overridden model — never the empty stored one.
+    assert all(c["model"] == "llama3" for c in fake_llm.calls)
+
+    session = (await client.get(f"/api/sessions/{sid}")).json()
+    assert session["model_config"]["model"] == "llama3"

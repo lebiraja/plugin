@@ -45,8 +45,9 @@ async function* readSSE(
 }
 
 export interface ChatTokenEvent {
-  type: "meta" | "token" | "done";
+  type: "meta" | "token" | "done" | "error";
   content?: string;
+  detail?: string;
   rag?: boolean;
   web_search?: boolean;
   message_id?: string;

@@ -52,6 +52,11 @@ class CreateSessionResponse(BaseModel):
 
 class SendMessageRequest(BaseModel):
     message: str = Field(..., min_length=1)
+    # Optional per-message overrides. Sessions are created before a model is
+    # picked, so the stored model_config.model can be empty; the client sends
+    # the currently-selected backend/model to override (and we persist it).
+    backend: Optional[str] = None
+    model: Optional[str] = None
     config: Optional[ModelConfig] = None
     tools_enabled: Optional[Dict[str, bool]] = None
 
@@ -200,6 +205,31 @@ def _history(session: Dict[str, Any]) -> List[Dict[str, str]]:
     ]
 
 
+async def _resolve_model(
+    request: SendMessageRequest,
+    session: Dict[str, Any],
+    sessions: SessionService,
+) -> Tuple[str, str]:
+    """
+    Resolve the backend/model to use, preferring the request's override over the
+    session's stored config. Persists the override so the session is no longer
+    stuck with an empty model. Raises if neither yields a usable model.
+    """
+    stored = session["model_config"]
+    backend = request.backend or stored.get("backend")
+    model = request.model or stored.get("model")
+
+    if not model:
+        raise ValidationError(
+            "No model selected. Choose a model in the sidebar before sending a message."
+        )
+
+    if request.backend or request.model:
+        await sessions.update_model_config(session["session_id"], backend, model)
+
+    return backend, model
+
+
 def _assistant_message(
     content: str,
     tokens: Dict[str, int],
@@ -236,6 +266,8 @@ async def _maybe_generate_title(
     user_message: str,
     assistant_content: str,
     sessions: SessionService,
+    backend: str,
+    model: str,
 ) -> None:
     """Kick off title generation in the background after the first exchange."""
     if session["metadata"]["total_messages"] == 0:
@@ -246,8 +278,8 @@ async def _maybe_generate_title(
                 session["session_id"],
                 user_message,
                 assistant_content,
-                session["model_config"]["backend"],
-                session["model_config"]["model"],
+                backend,
+                model,
             )
         )
 
@@ -266,6 +298,7 @@ async def send_message(
     if not session:
         raise NotFoundError("Session not found")
 
+    backend, model = await _resolve_model(request, session, sessions)
     await sessions.add_message(session_id, {"role": "user", "content": request.message, "files": []})
 
     prompt, rag_results, search_results = await _build_context(request, session, rag, search)
@@ -274,8 +307,8 @@ async def send_message(
     start = datetime.utcnow()
     response = await llm.generate_response(
         message=prompt,
-        backend=session["model_config"]["backend"],
-        model=session["model_config"]["model"],
+        backend=backend,
+        model=model,
         config=config,
         history=_history(session),
     )
@@ -285,7 +318,7 @@ async def send_message(
         response.get("content", ""), response.get("tokens", {}), latency, rag_results, search_results
     )
     await sessions.add_message(session_id, assistant)
-    await _maybe_generate_title(session, request.message, assistant["content"], sessions)
+    await _maybe_generate_title(session, request.message, assistant["content"], sessions, backend, model)
     return assistant
 
 
@@ -303,6 +336,10 @@ async def stream_message(
     if not session:
         raise NotFoundError("Session not found")
 
+    # Resolve before streaming so a missing model returns a clean 422 (not a
+    # dropped connection mid-stream).
+    backend, model = await _resolve_model(request, session, sessions)
+
     await sessions.add_message(session_id, {"role": "user", "content": request.message, "files": []})
     prompt, rag_results, search_results = await _build_context(request, session, rag, search)
     config = request.config.model_dump() if request.config else session["model_config"]
@@ -312,28 +349,34 @@ async def stream_message(
         parts: List[str] = []
         tokens: Dict[str, int] = {"prompt": 0, "completion": 0, "total": 0}
 
-        # Tell the client up front which tools contributed context.
         yield sse_event(
             {"type": "meta", "rag": bool(rag_results), "web_search": bool(search_results)}
         )
 
-        async for event in llm.stream_chat(
-            message=prompt,
-            backend=session["model_config"]["backend"],
-            model=session["model_config"]["model"],
-            config=config,
-            history=_history(session),
-        ):
-            if event["type"] == "token":
-                parts.append(event["content"])
-                yield sse_event({"type": "token", "content": event["content"]})
-            elif event["type"] == "done":
-                tokens = event.get("tokens", tokens)
+        try:
+            async for event in llm.stream_chat(
+                message=prompt,
+                backend=backend,
+                model=model,
+                config=config,
+                history=_history(session),
+            ):
+                if event["type"] == "token":
+                    parts.append(event["content"])
+                    yield sse_event({"type": "token", "content": event["content"]})
+                elif event["type"] == "done":
+                    tokens = event.get("tokens", tokens)
+        except Exception as exc:
+            # An error mid-stream must surface as an SSE event, not a dropped
+            # socket (which the proxy reports as "upstream prematurely closed").
+            logger.error("Streaming generation failed: %s", exc)
+            yield sse_event({"type": "error", "detail": "Generation failed. Please try again."})
+            return
 
         latency = (datetime.utcnow() - start).total_seconds() * 1000
         assistant = _assistant_message("".join(parts), tokens, latency, rag_results, search_results)
         await sessions.add_message(session_id, assistant)
-        await _maybe_generate_title(session, request.message, assistant["content"], sessions)
+        await _maybe_generate_title(session, request.message, assistant["content"], sessions, backend, model)
         yield sse_event(
             {
                 "type": "done",

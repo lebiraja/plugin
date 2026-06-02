@@ -80,6 +80,8 @@ export interface ToolsEnabled {
 
 export interface SendMessageRequest {
   message: string;
+  backend?: string;
+  model?: string;
   config?: SessionModelConfig;
   tools_enabled?: ToolsEnabled;
 }

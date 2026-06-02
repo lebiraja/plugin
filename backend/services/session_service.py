@@ -224,6 +224,22 @@ Title (3-4 words only):"""
         )
         return file_metadata if result.modified_count > 0 else None
 
+    async def update_model_config(
+        self, session_id: str, backend: str, model: str
+    ) -> bool:
+        """Update the session's backend/model (e.g. when first selected)."""
+        result = await db_service.sessions.update_one(
+            {"session_id": session_id},
+            {
+                "$set": {
+                    "model_config.backend": backend,
+                    "model_config.model": model,
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+        )
+        return result.modified_count > 0
+
     async def update_file_metadata(
         self, session_id: str, file_id: str, updates: Dict[str, Any]
     ) -> bool:
