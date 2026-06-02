@@ -1,75 +1,98 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional, Dict, Any
-import uvicorn
-from dotenv import load_dotenv
-import warnings
+"""Application entrypoint: FastAPI app, lifespan, middleware, routers."""
+
 import logging
 import os
+import time
+import uuid
+import warnings
+from contextlib import asynccontextmanager
 
-# Suppress unnecessary warnings
+import uvicorn
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+
+# Suppress noisy third-party warnings before heavy imports.
 warnings.filterwarnings("ignore", category=UserWarning, module="torch")
 warnings.filterwarnings("ignore", category=UserWarning, module="torchvision")
 warnings.filterwarnings("ignore", message=".*telemetry.*")
-warnings.filterwarnings("ignore", message=".*capture.*")
 
-# Create logs directory
 os.makedirs("logs", exist_ok=True)
-
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.FileHandler("logs/app.log"), logging.StreamHandler()],
 )
-
+logging.getLogger("watchfiles.main").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
-# Suppress watchfiles debug spam
-logging.getLogger("watchfiles.main").setLevel(logging.WARNING)
-
-# Load environment variables
 load_dotenv()
 
-from routers import chat, files, models, tools, health, deep_research, sessions
-from services.database_service import db_service
+from config import settings  # noqa: E402
+from errors import (  # noqa: E402
+    AppError,
+    app_error_handler,
+    unhandled_error_handler,
+)
+from routers import (  # noqa: E402
+    chat,
+    deep_research,
+    files,
+    health,
+    models,
+    sessions,
+    tools,
+)
+from services.database_service import db_service  # noqa: E402
 
-app = FastAPI(title="Local LLM Chat API", version="1.0.0")
 
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Connect to MongoDB on startup, disconnect on shutdown."""
     try:
         await db_service.connect()
         logger.info("Application startup complete")
-    except Exception as e:
-        logger.error(f"Startup failed: {e}")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
+    except Exception:
+        logger.exception("Startup failed")
+        raise
+    yield
     await db_service.disconnect()
     logger.info("Application shutdown complete")
 
 
-# CORS Configuration
+app = FastAPI(title="Local LLM Chat API", version="2.0.0", lifespan=lifespan)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
+
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next):
+    """Tag each request with a correlation id and log method/path/status/latency."""
+    correlation_id = uuid.uuid4().hex[:8]
+    start = time.perf_counter()
+    response = await call_next(request)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    response.headers["X-Request-ID"] = correlation_id
+    logger.info(
+        "[%s] %s %s -> %d (%.1fms)",
+        correlation_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+        elapsed_ms,
+    )
+    return response
+
+
+app.add_exception_handler(AppError, app_error_handler)
+app.add_exception_handler(Exception, unhandled_error_handler)
+
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(files.router, prefix="/api/files", tags=["files"])
@@ -83,19 +106,14 @@ app.include_router(sessions.router, prefix="/api/sessions", tags=["sessions"])
 
 @app.get("/")
 async def root():
-    return {"message": "Local LLM Chat API", "version": "1.0.0"}
-
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+    return {"message": "Local LLM Chat API", "version": "2.0.0"}
 
 
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
-        port=8000,
+        host=settings.host,
+        port=settings.port,
         reload=True,
         reload_excludes=["logs/*", "vector_db/*", "*.log", "__pycache__/*"],
     )

@@ -118,17 +118,21 @@ class DeepResearchService:
     using recursive search, multi-hop reasoning, and synthesis.
     """
 
-    def __init__(self):
-        self.llm_service = LLMService()
-        self.search_service = SearchService()
+    def __init__(
+        self,
+        llm_service: Optional[LLMService] = None,
+        search_service: Optional[SearchService] = None,
+        db_service=None,
+    ):
+        self.llm_service = llm_service or LLMService()
+        self.search_service = search_service or SearchService()
+        self.db_service = db_service
         self.research_cache: Dict[str, ResearchResult] = {}
 
         # Configuration
         self.max_searches_per_level = 5
         self.max_sources_per_search = 10
         self.min_quality_threshold = 0.6
-        self.llm_calls_count = 0
-        self.tokens_used = 0
 
     async def conduct_research(
         self,

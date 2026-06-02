@@ -1,16 +1,39 @@
-import httpx
-from typing import Dict, Any, AsyncGenerator
+"""
+LLM service: a thin, uniform client over the supported chat backends.
+
+Both Ollama and LM Studio expose an OpenAI-style chat endpoint that takes a
+``messages`` array, so we build messages once and stream tokens from either.
+Backend base URLs come from :mod:`config` — never hardcoded — so the same code
+works on bare metal (localhost) and in Docker (service names).
+"""
+
 import json
+import logging
+from typing import Any, AsyncGenerator, Dict, List, Optional
+
+import httpx
+
+from config import settings
+
+logger = logging.getLogger(__name__)
+
+# Backend identifiers used by the API/frontend, mapped to their config URL.
+OLLAMA_BACKEND = "ollama-default"
+LMSTUDIO_BACKEND = "lmstudio-default"
+
+DEFAULT_TIMEOUT = httpx.Timeout(120.0, connect=10.0)
 
 
 class LLMService:
-    """Service for interacting with different LLM backends"""
+    """Stateless client for chat-completion backends."""
 
-    def __init__(self):
-        self.backend_urls = {
-            "ollama-default": "http://localhost:11434",
-            "lmstudio-default": "http://localhost:1234",
+    def __init__(self) -> None:
+        self._backend_urls = {
+            OLLAMA_BACKEND: settings.ollama_url,
+            LMSTUDIO_BACKEND: settings.lmstudio_url,
         }
+
+    # ── public API ───────────────────────────────────────────────────────────
 
     async def generate_response(
         self,
@@ -18,184 +41,191 @@ class LLMService:
         backend: str,
         model: str,
         config: Dict[str, Any],
-        history: list = None,
+        history: Optional[List[Dict[str, str]]] = None,
+        system: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Generate a response from the specified backend"""
-        if history is None:
-            history = []
+        """Non-streaming convenience wrapper: drain the stream into one result."""
+        content_parts: List[str] = []
+        tokens: Dict[str, int] = {"prompt": 0, "completion": 0, "total": 0}
 
-        if backend == "ollama-default":
-            return await self._ollama_generate(message, model, config, history)
-        elif backend == "lmstudio-default":
-            return await self._lmstudio_generate(message, model, config, history)
+        async for event in self.stream_chat(
+            message=message,
+            backend=backend,
+            model=model,
+            config=config,
+            history=history,
+            system=system,
+        ):
+            if event["type"] == "token":
+                content_parts.append(event["content"])
+            elif event["type"] == "done":
+                tokens = event.get("tokens", tokens)
+
+        return {
+            "content": "".join(content_parts),
+            "model": model,
+            "backend": backend,
+            "tokens": tokens,
+        }
+
+    async def stream_chat(
+        self,
+        message: str,
+        backend: str,
+        model: str,
+        config: Dict[str, Any],
+        history: Optional[List[Dict[str, str]]] = None,
+        system: Optional[str] = None,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Stream a chat completion.
+
+        Yields events:
+          {"type": "token", "content": str}
+          {"type": "done", "tokens": {"prompt", "completion", "total"}}
+        """
+        messages = self._build_messages(message, history, system)
+
+        if backend == OLLAMA_BACKEND:
+            stream = self._ollama_stream(model, messages, config)
+        elif backend == LMSTUDIO_BACKEND:
+            stream = self._lmstudio_stream(model, messages, config)
         else:
             raise ValueError(f"Unsupported backend: {backend}")
 
-    async def stream_response(
-        self, message: str, backend: str, model: str, config: Dict[str, Any]
-    ) -> AsyncGenerator[str, None]:
-        """Stream a response from the specified backend"""
+        async for event in stream:
+            yield event
 
-        if backend == "ollama-default":
-            async for chunk in self._ollama_stream(message, model, config):
-                yield chunk
-        elif backend == "lmstudio-default":
-            async for chunk in self._lmstudio_stream(message, model, config):
-                yield chunk
+    # ── message construction ─────────────────────────────────────────────────
 
-    async def _ollama_generate(
-        self, message: str, model: str, config: Dict[str, Any], history: list = None
-    ) -> Dict[str, Any]:
-        """Generate response using Ollama"""
-        url = f"{self.backend_urls['ollama-default']}/api/generate"
-
-        # Build context from history
-        prompt = message
+    @staticmethod
+    def _build_messages(
+        message: str,
+        history: Optional[List[Dict[str, str]]],
+        system: Optional[str],
+    ) -> List[Dict[str, str]]:
+        messages: List[Dict[str, str]] = []
+        if system:
+            messages.append({"role": "system", "content": system})
         if history:
-            context_messages = []
             for msg in history[-10:]:
                 role = msg.get("role", "user")
                 content = msg.get("content", "")
-                prefix = "User: " if role == "user" else "Assistant: "
-                context_messages.append(f"{prefix}{content}")
+                if content:
+                    messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": message})
+        return messages
 
-            context = "\n".join(context_messages)
-            prompt = f"{context}\nUser: {message}\nAssistant:"
-
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": config.get("temperature", 0.7),
-                "top_p": config.get("topP", 0.9),
-                "num_predict": config.get("maxTokens", 2048),
-            },
+    @staticmethod
+    def _options(config: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "temperature": config.get("temperature", 0.7),
+            "top_p": config.get("topP", config.get("top_p", 0.9)),
+            "num_predict": config.get("maxTokens", config.get("max_tokens", 2048)),
         }
 
-        try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                response = await client.post(url, json=payload)
+    # ── Ollama (/api/chat) ───────────────────────────────────────────────────
 
-                # Log error details if request fails
-                if response.status_code != 200:
-                    error_text = response.text
-                    raise Exception(
-                        f"Ollama API error ({response.status_code}): {error_text}"
-                    )
-
-                data = response.json()
-
-            return {
-                "content": data.get("response", ""),
-                "model": model,
-                "backend": "ollama",
-                "tokens": {
-                    "prompt": data.get("prompt_eval_count", 0),
-                    "completion": data.get("eval_count", 0),
-                    "total": data.get("prompt_eval_count", 0)
-                    + data.get("eval_count", 0),
-                },
-            }
-        except httpx.HTTPStatusError as e:
-            raise Exception(
-                f"Ollama HTTP error: {e.response.status_code} - {e.response.text}"
-            )
-        except Exception as e:
-            raise Exception(f"Ollama generation failed: {str(e)}")
-
-    async def _lmstudio_generate(
-        self, message: str, model: str, config: Dict[str, Any], history: list = None
-    ) -> Dict[str, Any]:
-        """Generate response using LM Studio"""
-        url = f"{self.backend_urls['lmstudio-default']}/v1/chat/completions"
-
-        # Build messages from history
-        messages = []
-        if history:
-            # Include last 10 messages for context
-            messages = history[-10:]
-
-        # Add current message
-        messages.append({"role": "user", "content": message})
-
+    async def _ollama_stream(
+        self, model: str, messages: List[Dict[str, str]], config: Dict[str, Any]
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        url = f"{self._backend_urls[OLLAMA_BACKEND]}/api/chat"
         payload = {
             "model": model,
             "messages": messages,
-            "temperature": config.get("temperature", 0.7),
-            "top_p": config.get("topP", 0.9),
-            "max_tokens": config.get("maxTokens", 2048),
-        }
-
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
-
-        choice = data["choices"][0]
-        usage = data.get("usage", {})
-
-        return {
-            "content": choice["message"]["content"],
-            "model": model,
-            "backend": "lmstudio",
-            "tokens": {
-                "prompt": usage.get("prompt_tokens", 0),
-                "completion": usage.get("completion_tokens", 0),
-                "total": usage.get("total_tokens", 0),
-            },
-        }
-
-    async def _ollama_stream(
-        self, message: str, model: str, config: Dict[str, Any]
-    ) -> AsyncGenerator[str, None]:
-        """Stream response from Ollama"""
-        url = f"{self.backend_urls['ollama-default']}/api/generate"
-
-        payload = {
-            "model": model,
-            "prompt": message,
             "stream": True,
-            "options": {
-                "temperature": config.get("temperature", 0.7),
-                "top_p": config.get("topP", 0.9),
-                "num_predict": config.get("maxTokens", 2048),
-            },
+            "options": self._options(config),
         }
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            async with client.stream("POST", url, json=payload) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if line:
+        prompt_tokens = 0
+        completion_tokens = 0
+        try:
+            async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
+                async with client.stream("POST", url, json=payload) as response:
+                    if response.status_code != 200:
+                        body = (await response.aread()).decode(errors="replace")
+                        raise LLMBackendError(
+                            f"Ollama error ({response.status_code}): {body[:500]}"
+                        )
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
                         data = json.loads(line)
-                        if "response" in data:
-                            yield data["response"]
+                        chunk = data.get("message", {}).get("content")
+                        if chunk:
+                            yield {"type": "token", "content": chunk}
+                        if data.get("done"):
+                            prompt_tokens = data.get("prompt_eval_count", 0)
+                            completion_tokens = data.get("eval_count", 0)
+        except httpx.HTTPError as exc:
+            logger.error("Ollama request failed: %s", exc)
+            raise LLMBackendError(f"Ollama request failed: {exc}") from exc
+
+        yield self._done_event(prompt_tokens, completion_tokens)
+
+    # ── LM Studio (/v1/chat/completions, OpenAI SSE) ─────────────────────────
 
     async def _lmstudio_stream(
-        self, message: str, model: str, config: Dict[str, Any]
-    ) -> AsyncGenerator[str, None]:
-        """Stream response from LM Studio"""
-        url = f"{self.backend_urls['lmstudio-default']}/v1/chat/completions"
-
+        self, model: str, messages: List[Dict[str, str]], config: Dict[str, Any]
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        url = f"{self._backend_urls[LMSTUDIO_BACKEND]}/v1/chat/completions"
+        opts = self._options(config)
         payload = {
             "model": model,
-            "messages": [{"role": "user", "content": message}],
-            "temperature": config.get("temperature", 0.7),
-            "top_p": config.get("topP", 0.9),
-            "max_tokens": config.get("maxTokens", 2048),
+            "messages": messages,
+            "temperature": opts["temperature"],
+            "top_p": opts["top_p"],
+            "max_tokens": opts["num_predict"],
             "stream": True,
+            "stream_options": {"include_usage": True},
         }
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            async with client.stream("POST", url, json=payload) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if line and line.startswith("data: "):
-                        data_str = line[6:]
-                        if data_str != "[DONE]":
-                            data = json.loads(data_str)
-                            if "choices" in data and len(data["choices"]) > 0:
-                                delta = data["choices"][0].get("delta", {})
-                                if "content" in delta:
-                                    yield delta["content"]
+        prompt_tokens = 0
+        completion_tokens = 0
+        try:
+            async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
+                async with client.stream("POST", url, json=payload) as response:
+                    if response.status_code != 200:
+                        body = (await response.aread()).decode(errors="replace")
+                        raise LLMBackendError(
+                            f"LM Studio error ({response.status_code}): {body[:500]}"
+                        )
+                    async for line in response.aiter_lines():
+                        if not line or not line.startswith("data: "):
+                            continue
+                        data_str = line[6:].strip()
+                        if data_str == "[DONE]":
+                            break
+                        data = json.loads(data_str)
+                        usage = data.get("usage")
+                        if usage:
+                            prompt_tokens = usage.get("prompt_tokens", prompt_tokens)
+                            completion_tokens = usage.get(
+                                "completion_tokens", completion_tokens
+                            )
+                        choices = data.get("choices") or []
+                        if choices:
+                            delta = choices[0].get("delta", {})
+                            chunk = delta.get("content")
+                            if chunk:
+                                yield {"type": "token", "content": chunk}
+        except httpx.HTTPError as exc:
+            logger.error("LM Studio request failed: %s", exc)
+            raise LLMBackendError(f"LM Studio request failed: {exc}") from exc
+
+        yield self._done_event(prompt_tokens, completion_tokens)
+
+    @staticmethod
+    def _done_event(prompt: int, completion: int) -> Dict[str, Any]:
+        return {
+            "type": "done",
+            "tokens": {
+                "prompt": prompt,
+                "completion": completion,
+                "total": prompt + completion,
+            },
+        }
+
+
+class LLMBackendError(RuntimeError):
+    """Raised when an LLM backend returns an error or is unreachable."""

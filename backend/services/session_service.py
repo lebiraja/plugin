@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 class SessionService:
     """Service for managing chat sessions in MongoDB"""
 
-    def __init__(self):
-        self.llm_service = LLMService()
+    def __init__(self, llm_service: Optional[LLMService] = None):
+        self.llm_service = llm_service or LLMService()
 
     async def create_session(
         self, backend: str, model: str, config: Dict[str, Any]
