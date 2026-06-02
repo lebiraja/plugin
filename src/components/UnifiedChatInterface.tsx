@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { MessageSquare, Brain, PanelLeft, PanelRight } from "lucide-react";
-import { motion } from "framer-motion";
 import ChatInterface from "./ChatInterface";
 import { DeepResearchPanel } from "./research/DeepResearchPanel";
 import { ResearchResultsView } from "./research/ResearchResultsView";
 import { useDeepResearchStore } from "../store/deepResearchStore";
 import { useSettingsStore } from "../store/settingsStore";
+import { Button } from "./ui/button";
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 
 interface UnifiedChatInterfaceProps {
   onToggleLeftSidebar?: () => void;
@@ -27,69 +28,47 @@ export const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
   const deepResearchEnabled = settings.toolsConfig.deepResearch;
 
   return (
-    <div className="flex flex-col h-full relative">
-      {/* Floating Sidebar Toggle Buttons */}
-      <div className="absolute top-4 left-4 right-4 z-40 flex items-center justify-between pointer-events-none">
-        <div className="flex items-center space-x-2 pointer-events-auto">
-          {onToggleLeftSidebar && !isLeftSidebarOpen && (
-            <motion.button
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onToggleLeftSidebar}
-              className="liquid-button-icon shadow-liquid"
-              title="Open sessions (Cmd+B)"
-            >
-              <PanelLeft className="w-5 h-5 text-primary" />
-            </motion.button>
-          )}
-        </div>
+    <div className="relative flex h-full flex-col">
+      {/* Floating sidebar toggles (shown when a sidebar is collapsed) */}
+      {onToggleLeftSidebar && !isLeftSidebarOpen && (
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onToggleLeftSidebar}
+          className="absolute left-4 top-4 z-40"
+          title="Open sessions (Cmd+B)"
+        >
+          <PanelLeft className="h-5 w-5" />
+        </Button>
+      )}
+      {!isRightSidebarOpen && (
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onToggleRightSidebar}
+          className="absolute right-4 top-4 z-40"
+          title="Open inspector (Cmd+\\)"
+        >
+          <PanelRight className="h-5 w-5" />
+        </Button>
+      )}
 
-        <div className="flex items-center space-x-2 pointer-events-auto">
-          {!isRightSidebarOpen && (
-            <motion.button
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onToggleRightSidebar}
-              className="liquid-button-icon shadow-liquid"
-              title="Open sidebar (Cmd+\\)"
-            >
-              <PanelRight className="w-5 h-5 text-primary" />
-            </motion.button>
-          )}
-        </div>
-      </div>
-
-      {/* Floating Tab Bar for Mode Toggle */}
+      {/* Mode toggle */}
       {deepResearchEnabled && (
-        <div className="flex justify-center py-4 px-4">
-          <div className="floating-tab-bar">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setActiveMode("chat")}
-              className={`floating-tab-item ${activeMode === "chat" ? "active" : ""}`}
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Chat</span>
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setActiveMode("research")}
-              className={`floating-tab-item ${activeMode === "research" ? "active" : ""}`}
-            >
-              <Brain className="w-4 h-4" />
-              <span>Deep Research</span>
-            </motion.button>
-          </div>
+        <div className="flex justify-center px-4 py-4">
+          <Tabs value={activeMode} onValueChange={(v) => setActiveMode(v as "chat" | "research")}>
+            <TabsList>
+              <TabsTrigger value="chat">
+                <MessageSquare className="h-4 w-4" /> Chat
+              </TabsTrigger>
+              <TabsTrigger value="research">
+                <Brain className="h-4 w-4" /> Deep Research
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       )}
 
-      {/* Content */}
       <div className="flex-1 overflow-hidden">
         {activeMode === "chat" ? (
           <ChatInterface
@@ -97,16 +76,11 @@ export const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
             isRightSidebarOpen={isRightSidebarOpen}
           />
         ) : (
-          <div className="h-full overflow-y-auto p-6 scrollbar-thin">
-            <div className="max-w-5xl mx-auto space-y-6">
-              {/* Deep Research Panel */}
+          <div className="h-full overflow-y-auto p-6">
+            <div className="mx-auto max-w-5xl space-y-6">
               <DeepResearchPanel />
-
-              {/* Research Results */}
               {currentResearch && (
-                <div className="mt-8">
-                  <ResearchResultsView research={currentResearch} />
-                </div>
+                <ResearchResultsView research={currentResearch} />
               )}
             </div>
           </div>
