@@ -19,6 +19,11 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          // legacy shades used by the liquid classes still in transition
+          dark: "#0066CC",
+          light: "#409CFF",
+          muted: "rgba(10, 132, 255, 0.15)",
+          glow: "rgba(10, 132, 255, 0.35)",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
