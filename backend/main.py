@@ -17,11 +17,19 @@ warnings.filterwarnings("ignore", category=UserWarning, module="torch")
 warnings.filterwarnings("ignore", category=UserWarning, module="torchvision")
 warnings.filterwarnings("ignore", message=".*telemetry.*")
 
-os.makedirs("logs", exist_ok=True)
+_LOG_DIR = os.getenv("LOG_DIR", "logs")
+_handlers: list[logging.Handler] = [logging.StreamHandler()]
+try:
+    os.makedirs(_LOG_DIR, exist_ok=True)
+    _handlers.append(logging.FileHandler(os.path.join(_LOG_DIR, "app.log")))
+except OSError:
+    # Read-only or non-writable log dir (e.g. a root-owned Docker volume mount
+    # in local dev) must not crash startup — fall back to stderr only.
+    pass
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("logs/app.log"), logging.StreamHandler()],
+    handlers=_handlers,
 )
 logging.getLogger("watchfiles.main").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
