@@ -1,9 +1,57 @@
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ============================================
-   APPLE LIQUID GLASS UI - Dark Theme
+   shadcn-native refined-dark theme tokens.
+   A single near-black canvas, muted surfaces, one electric-blue accent.
+   Typography: Geist (UI), Geist Mono (code/metrics), Instrument Serif (display).
+   ============================================ */
+
+@layer base {
+  :root {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 96%;
+    --card: 240 8% 6%;
+    --card-foreground: 0 0% 96%;
+    --popover: 240 9% 7%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 211 100% 52%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 6% 12%;
+    --secondary-foreground: 0 0% 90%;
+    --muted: 240 5% 11%;
+    --muted-foreground: 240 5% 58%;
+    --accent: 240 6% 14%;
+    --accent-foreground: 0 0% 96%;
+    --destructive: 4 90% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 16%;
+    --input: 240 6% 16%;
+    --ring: 211 100% 52%;
+    --radius: 0.75rem;
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  .font-display {
+    font-family: "Instrument Serif", ui-serif, Georgia, serif;
+  }
+
+  .font-mono {
+    font-family: "Geist Mono", ui-monospace, monospace;
+  }
+}
+
+/* ============================================
+   APPLE LIQUID GLASS UI - Dark Theme (legacy, phased out per component)
    Based on iOS 26 / macOS Tahoe Design Language
    ============================================ */
 
@@ -699,7 +747,7 @@
 }
 
 .prose code {
-  @apply bg-dark-800 text-accent-cyan px-2 py-0.5 rounded-lg text-sm;
+  @apply bg-dark-800 text-apple-cyan px-2 py-0.5 rounded-lg text-sm;
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 

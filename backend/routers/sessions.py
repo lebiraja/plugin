@@ -1,31 +1,36 @@
-"""
-FastAPI router for chat session management
-"""
+"""Chat session management: CRUD, messaging (blocking + streaming), file upload."""
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from pydantic import BaseModel
-from typing import Optional, Dict
-from datetime import datetime
-import os
-import shutil
 import logging
+import os
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
-from services.session_service import SessionService
-from services.llm_service import LLMService
-from services import rag_service
-from services.search_service import SearchService
+import aiofiles
+from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+
 from config import settings
-
-router = APIRouter()
-session_service = SessionService()
-llm_service = LLMService()
-# Use singleton rag_service from services module
-search_service = SearchService()
+from dependencies import (
+    get_llm_service,
+    get_rag_service,
+    get_search_service,
+    get_session_service,
+)
+from errors import NotFoundError, ValidationError
+from services.llm_service import LLMService
+from services.rag_service import RAGService
+from services.search_service import SearchService
+from services.session_service import SessionService
+from sse import sse_event
 
 logger = logging.getLogger(__name__)
+router = APIRouter()
 
 
-# Pydantic Models
+# ── request/response models ───────────────────────────────────────────────────
+
+
 class ModelConfig(BaseModel):
     temperature: float = 0.7
     topP: float = 0.9
@@ -46,105 +51,139 @@ class CreateSessionResponse(BaseModel):
 
 
 class SendMessageRequest(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1)
+    # Optional per-message overrides. Sessions are created before a model is
+    # picked, so the stored model_config.model can be empty; the client sends
+    # the currently-selected backend/model to override (and we persist it).
+    backend: Optional[str] = None
+    model: Optional[str] = None
     config: Optional[ModelConfig] = None
     tools_enabled: Optional[Dict[str, bool]] = None
 
 
 class RenameSessionRequest(BaseModel):
-    title: str
+    title: str = Field(..., min_length=1)
+
+
+# ── CRUD ──────────────────────────────────────────────────────────────────────
 
 
 @router.post("/create", response_model=CreateSessionResponse)
-async def create_session(request: CreateSessionRequest):
-    """Create a new chat session"""
-    try:
-        config = request.config.dict() if request.config else {}
-        result = await session_service.create_session(
-            backend=request.backend, model=request.model, config=config
-        )
-        return result
-    except Exception as e:
-        logger.error(f"Failed to create session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+async def create_session(
+    request: CreateSessionRequest,
+    sessions: SessionService = Depends(get_session_service),
+):
+    config = request.config.model_dump() if request.config else {}
+    return await sessions.create_session(
+        backend=request.backend, model=request.model, config=config
+    )
 
 
 @router.get("")
-async def list_sessions(skip: int = 0, limit: int = 50, sort: str = "updated_at"):
-    """Get list of all sessions with pagination"""
-    try:
-        result = await session_service.list_sessions(
-            skip=skip, limit=limit, sort_by=sort
-        )
-        return result
-    except Exception as e:
-        logger.error(f"Failed to list sessions: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+async def list_sessions(
+    skip: int = 0,
+    limit: int = 50,
+    sort: str = "updated_at",
+    sessions: SessionService = Depends(get_session_service),
+):
+    return await sessions.list_sessions(skip=skip, limit=limit, sort_by=sort)
 
 
 @router.get("/{session_id}")
-async def get_session(session_id: str):
-    """Get a single session by ID"""
-    try:
-        session = await session_service.get_session(session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
-        return session
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+async def get_session(
+    session_id: str, sessions: SessionService = Depends(get_session_service)
+):
+    session = await sessions.get_session(session_id)
+    if not session:
+        raise NotFoundError("Session not found")
+    return session
 
 
-@router.post("/{session_id}/message")
-async def send_message(session_id: str, request: SendMessageRequest):
-    """Send a message in a session and get LLM response"""
-    try:
-        # Verify session exists
-        session = await session_service.get_session(session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
+@router.patch("/{session_id}/rename")
+async def rename_session(
+    session_id: str,
+    request: RenameSessionRequest,
+    sessions: SessionService = Depends(get_session_service),
+):
+    if not await sessions.rename_session(session_id, request.title):
+        raise NotFoundError("Session not found")
+    return {"success": True, "title": request.title}
 
-        # Add user message
-        user_message = {
-            "role": "user",
-            "content": request.message,
-            "files": [],
-        }
-        await session_service.add_message(session_id, user_message)
 
-        # Prepare context
-        tools_enabled = request.tools_enabled or {}
-        context_text = ""
-        rag_results = []
-        search_results = []
+@router.delete("/{session_id}")
+async def delete_session(
+    session_id: str,
+    sessions: SessionService = Depends(get_session_service),
+    rag: RAGService = Depends(get_rag_service),
+):
+    session = await sessions.get_session(session_id)
+    if session:
+        for file_meta in session.get("files", []):
+            path = file_meta.get("path")
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except OSError as exc:
+                    logger.warning("Failed to delete file %s: %s", path, exc)
+            if file_meta.get("file_id"):
+                await rag.delete_file(file_meta["file_id"])
+    if not await sessions.delete_session(session_id):
+        raise NotFoundError("Session not found")
+    return {"success": True}
 
-        # RAG query if enabled
-        if tools_enabled.get("rag") and session.get("files"):
-            file_ids = [f["file_id"] for f in session["files"]]
-            rag_results = await rag_service.query(request.message, file_ids, top_k=3)
-            if rag_results:
-                context_text += "\n\n--- Retrieved Context ---\n"
-                for idx, result in enumerate(rag_results):
-                    context_text += f"[{idx + 1}] From {result.get('source', 'unknown')}:\n{result.get('content', '')}\n\n"
 
-        # Web search if enabled
-        if tools_enabled.get("web_search"):
-            search_results = await search_service.search(request.message, max_results=5)
-            if search_results:
-                context_text += "\n\n--- Web Search Results ---\n"
-                for idx, result in enumerate(search_results):
-                    context_text += f"Source [{idx + 1}]: {result.get('title', '')}\n"
-                    context_text += f"URL: {result.get('url', '')}\n"
-                    content = result.get("content") or result.get("snippet", "")
-                    if content:
-                        context_text += f"Content: {content}\n\n"
+@router.post("/{session_id}/generate-title")
+async def generate_title(
+    session_id: str, sessions: SessionService = Depends(get_session_service)
+):
+    session = await sessions.get_session(session_id)
+    if not session:
+        raise NotFoundError("Session not found")
+    first_user = next(
+        (m["content"] for m in session.get("messages", []) if m["role"] == "user"), None
+    )
+    if not first_user:
+        raise ValidationError("No user message to derive a title from")
+    title = await sessions.generate_title(session_id, first_user)
+    return {"title": title}
 
-        # Build enhanced prompt
-        enhanced_prompt = request.message
-        if context_text:
-            enhanced_prompt = f"""You are a helpful AI assistant. Use the following context to answer the user's question accurately.
+
+# ── messaging ─────────────────────────────────────────────────────────────────
+
+
+async def _build_context(
+    request: SendMessageRequest,
+    session: Dict[str, Any],
+    rag: RAGService,
+    search: SearchService,
+) -> Tuple[str, List[Dict], List[Dict]]:
+    """Assemble RAG + web-search context and the enhanced prompt for a message."""
+    tools = request.tools_enabled or {}
+    context_text = ""
+    rag_results: List[Dict] = []
+    search_results: List[Dict] = []
+
+    if tools.get("rag") and session.get("files"):
+        file_ids = [f["file_id"] for f in session["files"]]
+        rag_results = await rag.query(request.message, file_ids, top_k=3)
+        if rag_results:
+            context_text += "\n\n--- Retrieved Context ---\n"
+            for idx, r in enumerate(rag_results):
+                context_text += f"[{idx + 1}] From {r.get('source', 'unknown')}:\n{r.get('content', '')}\n\n"
+
+    if tools.get("web_search"):
+        search_results = await search.search(request.message, max_results=5)
+        if search_results:
+            context_text += "\n\n--- Web Search Results ---\n"
+            for idx, r in enumerate(search_results):
+                context_text += f"Source [{idx + 1}]: {r.get('title', '')}\nURL: {r.get('url', '')}\n"
+                content = r.get("content") or r.get("snippet", "")
+                if content:
+                    context_text += f"Content: {content}\n\n"
+
+    prompt = request.message
+    if context_text:
+        prompt = f"""You are a helpful AI assistant. Use the following context to answer the user's question accurately.
 
 {context_text}
 --- User Question ---
@@ -156,239 +195,253 @@ IMPORTANT:
 - If the context doesn't contain enough information, say so clearly
 - Be specific and factual"""
 
-        # Get conversation history
-        messages = session.get("messages", [])
-        history = [{"role": m["role"], "content": m["content"]} for m in messages[-10:]]
+    return prompt, rag_results, search_results
 
-        # Generate LLM response
-        start_time = datetime.utcnow()
-        config = request.config.dict() if request.config else session["model_config"]
 
-        # Log request details for debugging
-        logger.info(
-            f"Generating response with backend={session['model_config']['backend']}, model={session['model_config']['model']}"
+def _history(session: Dict[str, Any]) -> List[Dict[str, str]]:
+    return [
+        {"role": m["role"], "content": m["content"]}
+        for m in session.get("messages", [])[-10:]
+    ]
+
+
+async def _resolve_model(
+    request: SendMessageRequest,
+    session: Dict[str, Any],
+    sessions: SessionService,
+) -> Tuple[str, str]:
+    """
+    Resolve the backend/model to use, preferring the request's override over the
+    session's stored config. Persists the override so the session is no longer
+    stuck with an empty model. Raises if neither yields a usable model.
+    """
+    stored = session["model_config"]
+    backend = request.backend or stored.get("backend")
+    model = request.model or stored.get("model")
+
+    if not model:
+        raise ValidationError(
+            "No model selected. Choose a model in the sidebar before sending a message."
         )
 
-        response = await llm_service.generate_response(
-            message=enhanced_prompt,
-            backend=session["model_config"]["backend"],
-            model=session["model_config"]["model"],
-            config=config,
-            history=history,
-        )
+    if request.backend or request.model:
+        await sessions.update_model_config(session["session_id"], backend, model)
 
-        latency = (datetime.utcnow() - start_time).total_seconds() * 1000
+    return backend, model
 
-        # Prepare assistant message
-        assistant_message = {
-            "role": "assistant",
-            "content": response.get("content", ""),
-            "tokens": response.get("tokens"),
-            "latency": latency,
-            "tools_used": {
-                "web_search": bool(search_results),
-                "rag": bool(rag_results),
-                "deep_research": False,
-            },
-        }
 
-        # Add citations if available
-        if search_results:
-            assistant_message["citations"] = [
-                {
-                    "title": r.get("title", ""),
-                    "url": r.get("url", ""),
-                    "snippet": r.get("snippet", ""),
-                }
-                for r in search_results
-            ]
+def _assistant_message(
+    content: str,
+    tokens: Dict[str, int],
+    latency: float,
+    rag_results: List[Dict],
+    search_results: List[Dict],
+) -> Dict[str, Any]:
+    message: Dict[str, Any] = {
+        "role": "assistant",
+        "content": content,
+        "tokens": tokens,
+        "latency": latency,
+        "tools_used": {
+            "web_search": bool(search_results),
+            "rag": bool(rag_results),
+            "deep_research": False,
+        },
+    }
+    if search_results:
+        message["citations"] = [
+            {"title": r.get("title", ""), "url": r.get("url", ""), "snippet": r.get("snippet", "")}
+            for r in search_results
+        ]
+    if rag_results:
+        message["retrieved_context"] = [
+            {"source": r.get("source", ""), "content": r.get("content", ""), "similarity": r.get("similarity", 0)}
+            for r in rag_results
+        ]
+    return message
 
-        # Add retrieved context if available
-        if rag_results:
-            assistant_message["retrieved_context"] = [
-                {
-                    "source": r.get("source", ""),
-                    "content": r.get("content", ""),
-                    "similarity": r.get("similarity", 0),
-                }
-                for r in rag_results
-            ]
 
-        # Save assistant message
-        await session_service.add_message(session_id, assistant_message)
+async def _maybe_generate_title(
+    session: Dict[str, Any],
+    user_message: str,
+    assistant_content: str,
+    sessions: SessionService,
+    backend: str,
+    model: str,
+) -> None:
+    """Kick off title generation in the background after the first exchange."""
+    if session["metadata"]["total_messages"] == 0:
+        import asyncio
 
-        # Generate title AFTER first exchange (user + assistant messages)
-        if session["metadata"]["total_messages"] == 0:
-            # Run title generation in background (don't wait for it)
-            import asyncio
-
-            asyncio.create_task(
-                session_service.generate_title(
-                    session_id,
-                    request.message,
-                    assistant_message["content"],
-                    session["model_config"]["backend"],
-                    session["model_config"]["model"],
-                )
+        asyncio.create_task(
+            sessions.generate_title(
+                session["session_id"],
+                user_message,
+                assistant_content,
+                backend,
+                model,
             )
-
-        return assistant_message
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to send message: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/{session_id}/generate-title")
-async def generate_title(session_id: str):
-    """Auto-generate title for session from first message"""
-    try:
-        session = await session_service.get_session(session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        messages = session.get("messages", [])
-        if not messages:
-            raise HTTPException(status_code=400, detail="No messages in session")
-
-        first_message = next(
-            (m["content"] for m in messages if m["role"] == "user"), None
         )
-        if not first_message:
-            raise HTTPException(status_code=400, detail="No user message found")
-
-        title = await session_service.generate_title(session_id, first_message)
-        return {"title": title}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to generate title: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.patch("/{session_id}/rename")
-async def rename_session(session_id: str, request: RenameSessionRequest):
-    """Rename a session"""
-    try:
-        success = await session_service.rename_session(session_id, request.title)
-        if not success:
-            raise HTTPException(status_code=404, detail="Session not found")
-        return {"success": True, "title": request.title}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to rename session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+@router.post("/{session_id}/message")
+async def send_message(
+    session_id: str,
+    request: SendMessageRequest,
+    sessions: SessionService = Depends(get_session_service),
+    llm: LLMService = Depends(get_llm_service),
+    rag: RAGService = Depends(get_rag_service),
+    search: SearchService = Depends(get_search_service),
+):
+    """Send a message and get the complete assistant response."""
+    session = await sessions.get_session(session_id)
+    if not session:
+        raise NotFoundError("Session not found")
+
+    backend, model = await _resolve_model(request, session, sessions)
+    await sessions.add_message(session_id, {"role": "user", "content": request.message, "files": []})
+
+    prompt, rag_results, search_results = await _build_context(request, session, rag, search)
+    config = request.config.model_dump() if request.config else session["model_config"]
+
+    start = datetime.utcnow()
+    response = await llm.generate_response(
+        message=prompt,
+        backend=backend,
+        model=model,
+        config=config,
+        history=_history(session),
+    )
+    latency = (datetime.utcnow() - start).total_seconds() * 1000
+
+    assistant = _assistant_message(
+        response.get("content", ""), response.get("tokens", {}), latency, rag_results, search_results
+    )
+    await sessions.add_message(session_id, assistant)
+    await _maybe_generate_title(session, request.message, assistant["content"], sessions, backend, model)
+    return assistant
 
 
-@router.delete("/{session_id}")
-async def delete_session(session_id: str):
-    """Delete a session and its associated files"""
-    try:
-        # Get session to find files
-        session = await session_service.get_session(session_id)
-        if session:
-            # Delete files from disk
-            for file_meta in session.get("files", []):
-                file_path = file_meta.get("path")
-                if file_path and os.path.exists(file_path):
-                    try:
-                        os.remove(file_path)
-                    except Exception as e:
-                        logger.warning(f"Failed to delete file {file_path}: {e}")
+@router.post("/{session_id}/message/stream")
+async def stream_message(
+    session_id: str,
+    request: SendMessageRequest,
+    sessions: SessionService = Depends(get_session_service),
+    llm: LLMService = Depends(get_llm_service),
+    rag: RAGService = Depends(get_rag_service),
+    search: SearchService = Depends(get_search_service),
+):
+    """Stream the assistant response token-by-token (SSE), persisting at the end."""
+    session = await sessions.get_session(session_id)
+    if not session:
+        raise NotFoundError("Session not found")
 
-        # Delete session from database
-        success = await session_service.delete_session(session_id)
-        if not success:
-            raise HTTPException(status_code=404, detail="Session not found")
+    # Resolve before streaming so a missing model returns a clean 422 (not a
+    # dropped connection mid-stream).
+    backend, model = await _resolve_model(request, session, sessions)
 
-        return {"success": True}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to delete session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    await sessions.add_message(session_id, {"role": "user", "content": request.message, "files": []})
+    prompt, rag_results, search_results = await _build_context(request, session, rag, search)
+    config = request.config.model_dump() if request.config else session["model_config"]
+
+    async def generate():
+        start = datetime.utcnow()
+        parts: List[str] = []
+        tokens: Dict[str, int] = {"prompt": 0, "completion": 0, "total": 0}
+
+        yield sse_event(
+            {"type": "meta", "rag": bool(rag_results), "web_search": bool(search_results)}
+        )
+
+        try:
+            async for event in llm.stream_chat(
+                message=prompt,
+                backend=backend,
+                model=model,
+                config=config,
+                history=_history(session),
+            ):
+                if event["type"] == "token":
+                    parts.append(event["content"])
+                    yield sse_event({"type": "token", "content": event["content"]})
+                elif event["type"] == "done":
+                    tokens = event.get("tokens", tokens)
+        except Exception as exc:
+            # An error mid-stream must surface as an SSE event, not a dropped
+            # socket (which the proxy reports as "upstream prematurely closed").
+            logger.error("Streaming generation failed: %s", exc)
+            yield sse_event({"type": "error", "detail": "Generation failed. Please try again."})
+            return
+
+        latency = (datetime.utcnow() - start).total_seconds() * 1000
+        assistant = _assistant_message("".join(parts), tokens, latency, rag_results, search_results)
+        await sessions.add_message(session_id, assistant)
+        await _maybe_generate_title(session, request.message, assistant["content"], sessions, backend, model)
+        yield sse_event(
+            {
+                "type": "done",
+                "message_id": assistant["message_id"],
+                "tokens": tokens,
+                "latency": latency,
+                "citations": assistant.get("citations", []),
+                "retrieved_context": assistant.get("retrieved_context", []),
+            }
+        )
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+# ── file upload ───────────────────────────────────────────────────────────────
 
 
 @router.post("/{session_id}/upload")
-async def upload_file_to_session(session_id: str, file: UploadFile = File(...)):
-    """Upload a file to a session and process it for RAG"""
-    try:
-        # Verify session exists
-        session = await session_service.get_session(session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
+async def upload_file_to_session(
+    session_id: str,
+    file: UploadFile = File(...),
+    sessions: SessionService = Depends(get_session_service),
+    rag: RAGService = Depends(get_rag_service),
+):
+    """Upload a file to a session and embed it for RAG."""
+    session = await sessions.get_session(session_id)
+    if not session:
+        raise NotFoundError("Session not found")
 
-        # Create session-specific upload directory
-        session_upload_dir = os.path.join(settings.upload_dir, session_id)
-        os.makedirs(session_upload_dir, exist_ok=True)
+    session_dir = os.path.join(settings.upload_dir, session_id)
+    os.makedirs(session_dir, exist_ok=True)
+    file_path = os.path.join(session_dir, file.filename)
 
-        # Save file
-        file_path = os.path.join(session_upload_dir, file.filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+    content = await file.read()
+    if len(content) > settings.max_file_size:
+        raise ValidationError(
+            f"File exceeds the {settings.max_file_size // (1024 * 1024)}MB limit."
+        )
+    async with aiofiles.open(file_path, "wb") as buffer:
+        await buffer.write(content)
 
-        file_size = os.path.getsize(file_path)
-
-        # Prepare file metadata
-        file_metadata = {
+    stored = await sessions.add_file_to_session(
+        session_id,
+        {
             "filename": file.filename,
             "path": file_path,
             "type": file.content_type or "unknown",
-            "size": file_size,
+            "size": len(content),
             "embedded": False,
             "chunks": 0,
-        }
+        },
+    )
+    if not stored:
+        raise NotFoundError("Session not found")
 
-        # Add to session (this will generate file_id)
-        await session_service.add_file_to_session(session_id, file_metadata)
+    file_id = stored["file_id"]
+    try:
+        chunks = await rag.add_document(file_path, file_id, session_id)
+        await sessions.update_file_metadata(
+            session_id, file_id, {"embedded": True, "chunks": chunks}
+        )
+        stored["embedded"] = True
+        stored["chunks"] = chunks
+        logger.info("Embedded %s for session %s (%d chunks)", file.filename, session_id, chunks)
+    except Exception:
+        logger.exception("Failed to embed %s for RAG", file.filename)
 
-        # Get the session again to retrieve the file_id
-        updated_session = await session_service.get_session(session_id)
-        uploaded_file = None
-        for f in updated_session.get("files", []):
-            if f["filename"] == file.filename and f["path"] == file_path:
-                uploaded_file = f
-                break
-
-        if not uploaded_file:
-            raise HTTPException(
-                status_code=500, detail="Failed to retrieve uploaded file"
-            )
-
-        file_id = uploaded_file["file_id"]
-
-        # Process file with RAG service
-        try:
-            chunks_created = await rag_service.add_document(
-                file_path, file_id, session_id
-            )
-
-            # Update file metadata with embedding info
-            await session_service.update_file_metadata(
-                session_id, file_id, {"embedded": True, "chunks": chunks_created}
-            )
-
-            uploaded_file["embedded"] = True
-            uploaded_file["chunks"] = chunks_created
-
-            logger.info(
-                f"File processed for session {session_id}: {file.filename} ({chunks_created} chunks)"
-            )
-
-        except Exception as e:
-            logger.error(f"Failed to process file for RAG: {e}")
-            # File is uploaded but not embedded - user can still see it
-
-        logger.info(f"File uploaded to session {session_id}: {file.filename}")
-
-        return uploaded_file
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to upload file: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    return stored

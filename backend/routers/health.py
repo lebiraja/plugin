@@ -1,8 +1,13 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Dict, Optional
-import httpx
+"""Health checks for the API and its LLM backends."""
+
 import logging
+from typing import Dict, Optional
+
+import httpx
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -15,72 +20,44 @@ class HealthStatus(BaseModel):
     details: Optional[Dict[str, str]] = None
 
 
+async def _probe(url: str) -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url)
+            return response.status_code == 200
+    except Exception as exc:
+        logger.debug("Health probe failed for %s: %s", url, exc)
+        return False
+
+
 @router.get("/health", response_model=HealthStatus)
 async def health_check():
-    """Comprehensive health check for API and LLM backends"""
+    """Overall API health plus per-backend availability."""
+    ollama_ok = await _probe(f"{settings.ollama_url}/api/tags")
+    lmstudio_ok = await _probe(f"{settings.lmstudio_url}/v1/models")
 
-    backends = {
-        "ollama": False,
-        "lmstudio": False,
+    backends = {"ollama": ollama_ok, "lmstudio": lmstudio_ok}
+    details = {
+        "ollama": "Available" if ollama_ok else "Offline",
+        "lmstudio": "Available" if lmstudio_ok else "Offline",
     }
-
-    details = {}
-
-    # Check Ollama
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get("http://localhost:11434/api/tags")
-            if response.status_code == 200:
-                backends["ollama"] = True
-                details["ollama"] = "Available"
-            else:
-                details["ollama"] = f"HTTP {response.status_code}"
-    except Exception as e:
-        details["ollama"] = "Offline"
-        logger.debug(f"Ollama health check failed: {e}")
-
-    # Check LM Studio
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get("http://localhost:1234/v1/models")
-            if response.status_code == 200:
-                backends["lmstudio"] = True
-                details["lmstudio"] = "Available"
-            else:
-                details["lmstudio"] = f"HTTP {response.status_code}"
-    except Exception as e:
-        details["lmstudio"] = "Offline"
-        logger.debug(f"LM Studio health check failed: {e}")
-
-    # Determine overall status
     status = "healthy" if any(backends.values()) else "degraded"
-
     return HealthStatus(status=status, backends=backends, details=details)
 
 
 @router.get("/health/ollama")
 async def check_ollama():
-    """Check if Ollama is available"""
-    try:
+    if await _probe(f"{settings.ollama_url}/api/tags"):
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get("http://localhost:11434/api/tags")
-            if response.status_code == 200:
-                return {"available": True, "models": response.json().get("models", [])}
-    except Exception as e:
-        logger.debug(f"Ollama check failed: {e}")
-
+            response = await client.get(f"{settings.ollama_url}/api/tags")
+            return {"available": True, "models": response.json().get("models", [])}
     return {"available": False, "error": "Ollama is not running"}
 
 
 @router.get("/health/lmstudio")
 async def check_lmstudio():
-    """Check if LM Studio is available"""
-    try:
+    if await _probe(f"{settings.lmstudio_url}/v1/models"):
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get("http://localhost:1234/v1/models")
-            if response.status_code == 200:
-                return {"available": True, "models": response.json().get("data", [])}
-    except Exception as e:
-        logger.debug(f"LM Studio check failed: {e}")
-
+            response = await client.get(f"{settings.lmstudio_url}/v1/models")
+            return {"available": True, "models": response.json().get("data", [])}
     return {"available": False, "error": "LM Studio is not running"}

@@ -2,19 +2,20 @@
 Deep Research Router - API endpoints for comprehensive research operations
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 import logging
 
+from dependencies import get_deep_research_service
+from errors import NotFoundError
 from services.deep_research_service import DeepResearchService, ResearchResult
+from sse import sse_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-# Initialize deep research service
-deep_research_service = DeepResearchService()
 
 
 # Request/Response Models
@@ -106,120 +107,88 @@ class ResearchStatusResponse(BaseModel):
 
 # Endpoints
 @router.post("/conduct", response_model=DeepResearchResponse)
-async def conduct_deep_research(request: DeepResearchRequest):
-    """
-    Conduct comprehensive deep research on a query.
+async def conduct_deep_research(
+    request: DeepResearchRequest,
+    service: DeepResearchService = Depends(get_deep_research_service),
+):
+    """Run the full multi-stage research pipeline and return the report."""
+    result: ResearchResult = await service.conduct_research(
+        query=request.query,
+        backend=request.backend,
+        model=request.model,
+        max_depth=request.max_depth,
+        max_sources=request.max_sources,
+    )
+    return _convert_to_response(result)
 
-    This endpoint performs multi-stage research:
-    1. Generate research plan (sub-questions, search queries)
-    2. Multi-level search and evidence collection
-    3. Multi-hop reasoning across sources
-    4. Report synthesis with citations
 
-    Returns complete research results with structured report.
-    """
-    try:
-        logger.info(f"🔬 Deep research request: {request.query}")
+@router.post("/conduct/stream")
+async def conduct_deep_research_stream(
+    request: DeepResearchRequest,
+    service: DeepResearchService = Depends(get_deep_research_service),
+):
+    """Run research, streaming stage progress then the final result as SSE."""
 
-        # Conduct research
-        result: ResearchResult = await deep_research_service.conduct_research(
+    async def generate():
+        async for event in service.conduct_research_streaming(
             query=request.query,
             backend=request.backend,
             model=request.model,
             max_depth=request.max_depth,
             max_sources=request.max_sources,
-        )
+        ):
+            if event["stage"] in ("complete", "cached"):
+                yield sse_event(
+                    {
+                        "stage": event["stage"],
+                        "progress": event.get("progress", 100),
+                        "result": _convert_to_response(event["result"]).model_dump(),
+                    }
+                )
+            else:
+                yield sse_event(event)
 
-        # Convert to response model
-        response = _convert_to_response(result)
-
-        logger.info(f"✅ Research completed: {result.research_id}")
-        return response
-
-    except Exception as e:
-        logger.error(f"❌ Deep research failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Research failed: {str(e)}")
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 @router.get("/status/{research_id}", response_model=ResearchStatusResponse)
-async def get_research_status(research_id: str):
-    """
-    Check status of a research operation.
-
-    Returns whether research is cached, in progress, or needs to be started.
-    """
-    try:
-        cached_result = deep_research_service.get_cached_research(research_id)
-
-        if cached_result:
-            return ResearchStatusResponse(
-                research_id=research_id,
-                status="cached",
-                progress=f"Completed at {cached_result.created_at.isoformat()}",
-            )
-        else:
-            return ResearchStatusResponse(
-                research_id=research_id,
-                status="not_found",
-                progress="Research not found in cache",
-            )
-
-    except Exception as e:
-        logger.error(f"Status check failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+async def get_research_status(
+    research_id: str,
+    service: DeepResearchService = Depends(get_deep_research_service),
+):
+    """Check whether a research result is persisted/cached."""
+    cached = await service.get_cached_research(research_id)
+    if cached:
+        return ResearchStatusResponse(
+            research_id=research_id,
+            status="cached",
+            progress=f"Completed at {cached.created_at.isoformat()}",
+        )
+    return ResearchStatusResponse(
+        research_id=research_id, status="not_found", progress="Not found"
+    )
 
 
 @router.get("/cache/stats")
-async def get_cache_stats():
-    """
-    Get cache statistics.
-
-    Returns information about cached research results.
-    """
-    try:
-        cache_size = len(deep_research_service.research_cache)
-
-        cached_queries = [
-            {
-                "research_id": rid,
-                "query": result.query,
-                "created_at": result.created_at.isoformat(),
-                "sources": len(result.evidence),
-                "cache_hits": result.metadata.cache_hits,
-            }
-            for rid, result in deep_research_service.research_cache.items()
-        ]
-
-        return {
-            "cache_size": cache_size,
-            "cached_research": cached_queries,
-        }
-
-    except Exception as e:
-        logger.error(f"Cache stats failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+async def get_cache_stats(
+    service: DeepResearchService = Depends(get_deep_research_service),
+):
+    """List persisted research summaries."""
+    cached = await service.list_cached()
+    return {"cache_size": len(cached), "cached_research": cached}
 
 
 @router.delete("/cache/clear")
-async def clear_cache():
-    """
-    Clear the research cache.
-
-    Removes all cached research results.
-    """
-    try:
-        cache_size_before = len(deep_research_service.research_cache)
-        deep_research_service.research_cache.clear()
-
-        return {
-            "success": True,
-            "cleared_count": cache_size_before,
-            "message": f"Cleared {cache_size_before} cached research results",
-        }
-
-    except Exception as e:
-        logger.error(f"Cache clear failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+async def clear_cache(
+    service: DeepResearchService = Depends(get_deep_research_service),
+):
+    """Clear all persisted research results."""
+    cleared = await service.clear_cache()
+    return {
+        "success": True,
+        "cleared_count": cleared,
+        "message": f"Cleared {cleared} cached research results",
+    }
 
 
 # Helper Functions

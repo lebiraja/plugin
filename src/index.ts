@@ -9,7 +9,6 @@ export { SessionSidebar } from './components/SessionSidebar';
 export { default as RightSidebar } from './components/RightSidebar';
 export { default as SettingsModal } from './components/SettingsModal';
 export { default as FileCard } from './components/FileCard';
-export { default as LeftSidebar } from './components/LeftSidebar';
 
 // Common Components
 export { ErrorBoundary } from './components/common/ErrorBoundary';

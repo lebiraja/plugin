@@ -10,10 +10,11 @@ Features:
 - Structured report synthesis with citations
 """
 
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, field
+from typing import List, Dict, Any, AsyncGenerator, Optional
+from dataclasses import dataclass, field, asdict
 from datetime import datetime
 import asyncio
+import contextvars
 import hashlib
 import json
 import logging
@@ -22,6 +23,23 @@ from services.llm_service import LLMService
 from services.search_service import SearchService
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _Counters:
+    """Per-request LLM usage counters.
+
+    These were previously instance attributes (self.llm_calls_count /
+    self.tokens_used), which raced when two research requests ran concurrently
+    on the shared singleton. A ContextVar gives each request (each asyncio task
+    chain) its own isolated counters.
+    """
+
+    llm_calls: int = 0
+    tokens_used: int = 0
+
+
+_counters: contextvars.ContextVar[_Counters] = contextvars.ContextVar("research_counters")
 
 
 @dataclass
@@ -118,17 +136,78 @@ class DeepResearchService:
     using recursive search, multi-hop reasoning, and synthesis.
     """
 
-    def __init__(self):
-        self.llm_service = LLMService()
-        self.search_service = SearchService()
-        self.research_cache: Dict[str, ResearchResult] = {}
+    def __init__(
+        self,
+        llm_service: Optional[LLMService] = None,
+        search_service: Optional[SearchService] = None,
+        db_service=None,
+    ):
+        self.llm_service = llm_service or LLMService()
+        self.search_service = search_service or SearchService()
+        self.db_service = db_service
 
         # Configuration
         self.max_searches_per_level = 5
         self.max_sources_per_search = 10
         self.min_quality_threshold = 0.6
-        self.llm_calls_count = 0
-        self.tokens_used = 0
+
+        # Small hot cache in front of Mongo persistence.
+        self._memory_cache: Dict[str, ResearchResult] = {}
+
+    # ── per-request usage tracking ────────────────────────────────────────────
+
+    @staticmethod
+    def _track(response: Dict[str, Any]) -> None:
+        """Record one LLM call + its token usage on the current request's counters."""
+        counters = _counters.get(None)
+        if counters is not None:
+            counters.llm_calls += 1
+            counters.tokens_used += response.get("tokens", {}).get("total", 0)
+
+    async def _call_llm(self, **kwargs) -> Dict[str, Any]:
+        """generate_response wrapper that auto-tracks usage."""
+        response = await self.llm_service.generate_response(**kwargs)
+        self._track(response)
+        return response
+
+    @staticmethod
+    def _parse_json_block(content: str) -> Any:
+        """Extract and parse a JSON object from an LLM response (handles ``` fences)."""
+        text = content.strip()
+        if "```json" in text:
+            text = text.split("```json", 1)[1].split("```", 1)[0].strip()
+        elif "```" in text:
+            text = text.split("```", 1)[1].split("```", 1)[0].strip()
+        return json.loads(text)
+
+    # ── persistence (MongoDB-backed, with an in-memory hot cache) ──────────────
+
+    async def _load_cached(self, research_id: str) -> Optional["ResearchResult"]:
+        if research_id in self._memory_cache:
+            return self._memory_cache[research_id]
+        if self.db_service is None:
+            return None
+        doc = await self.db_service.db.research_results.find_one(
+            {"research_id": research_id}, {"_id": 0}
+        )
+        if not doc:
+            return None
+        result = _deserialize_result(doc)
+        self._memory_cache[research_id] = result
+        return result
+
+    async def _persist(self, result: "ResearchResult") -> None:
+        self._memory_cache[result.research_id] = result
+        if self.db_service is None:
+            return
+        try:
+            await self.db_service.db.research_results.replace_one(
+                {"research_id": result.research_id},
+                _serialize_result(result),
+                upsert=True,
+            )
+        except Exception:
+            logger.exception("Failed to persist research %s", result.research_id)
 
     async def conduct_research(
         self,
@@ -151,56 +230,74 @@ class DeepResearchService:
         Returns:
             Complete research result with report and citations
         """
+        result: Optional[ResearchResult] = None
+        async for event in self.conduct_research_streaming(
+            query, backend, model, max_depth, max_sources
+        ):
+            if event["stage"] == "complete":
+                result = event["result"]
+        if result is None:  # pragma: no cover - streaming always yields complete
+            raise RuntimeError("Research did not produce a result")
+        return result
+
+    async def conduct_research_streaming(
+        self,
+        query: str,
+        backend: str,
+        model: str,
+        max_depth: int = 2,
+        max_sources: int = 15,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Run the research pipeline, yielding stage-progress events:
+
+          {"stage": "planning"|"searching"|"reasoning"|"synthesizing",
+           "progress": int, "message": str}
+          {"stage": "cached"|"complete", "result": ResearchResult, ...}
+
+        Counters are request-local (a ContextVar), so concurrent research
+        requests never corrupt each other's token/call counts.
+        """
         start_time = datetime.now()
-        logger.info(f"🔬 Starting deep research for: {query}")
-
-        # Generate unique research ID
         research_id = self._generate_research_id(query)
+        logger.info("🔬 Deep research: %s (%s)", query, research_id)
 
-        # Check cache
-        if research_id in self.research_cache:
-            logger.info(f"✅ Returning cached research for: {query}")
-            cached = self.research_cache[research_id]
+        cached = await self._load_cached(research_id)
+        if cached is not None:
             cached.metadata.cache_hits += 1
-            return cached
+            await self._persist(cached)
+            yield {"stage": "cached", "progress": 100, "result": cached}
+            return
 
+        token = _counters.set(_Counters())
         try:
-            # Stage 1: Generate Research Plan
-            logger.info("📋 Stage 1: Generating research plan...")
+            yield {"stage": "planning", "progress": 10, "message": "Generating research plan"}
             plan = await self._generate_research_plan(query, backend, model, max_depth)
 
-            # Stage 2: Multi-Level Search & Evidence Collection
-            logger.info("🔍 Stage 2: Conducting multi-level search...")
+            yield {"stage": "searching", "progress": 35, "message": "Collecting evidence"}
             evidence = await self._collect_evidence(
                 plan, backend, model, max_sources, max_depth
             )
 
-            # Stage 3: Multi-Hop Reasoning
-            logger.info("🧠 Stage 3: Analyzing evidence with multi-hop reasoning...")
+            yield {"stage": "reasoning", "progress": 65, "message": "Multi-hop reasoning"}
             reasoning_trace = await self._multi_hop_reasoning(
                 plan, evidence, backend, model
             )
 
-            # Stage 4: Synthesize Final Report
-            logger.info("📝 Stage 4: Synthesizing final report...")
+            yield {"stage": "synthesizing", "progress": 85, "message": "Synthesizing report"}
             final_report = await self._synthesize_report(
                 query, plan, evidence, reasoning_trace, backend, model
             )
 
-            # Stage 5: Extract Citations
             citations = self._extract_citations(evidence)
-
-            # Calculate metadata
-            time_taken = (datetime.now() - start_time).total_seconds()
+            counters = _counters.get()
             metadata = ResearchMetadata(
-                time_taken=time_taken,
-                tokens_used=self.tokens_used,
+                time_taken=(datetime.now() - start_time).total_seconds(),
+                tokens_used=counters.tokens_used,
                 searches_performed=len(plan.search_queries),
                 sources_scraped=len(evidence),
-                llm_calls=self.llm_calls_count,
+                llm_calls=counters.llm_calls,
             )
-
-            # Create result
             result = ResearchResult(
                 research_id=research_id,
                 query=query,
@@ -211,16 +308,14 @@ class DeepResearchService:
                 citations=citations,
                 metadata=metadata,
             )
-
-            # Cache result
-            self.research_cache[research_id] = result
-
-            logger.info(f"✅ Research complete in {time_taken:.2f}s")
-            return result
-
-        except Exception as e:
-            logger.error(f"❌ Research failed: {e}", exc_info=True)
+            await self._persist(result)
+            logger.info("✅ Research complete in %.2fs", metadata.time_taken)
+            yield {"stage": "complete", "progress": 100, "result": result}
+        except Exception:
+            logger.exception("Deep research failed for %s", query)
             raise
+        finally:
+            _counters.reset(token)
 
     async def _generate_research_plan(
         self, query: str, backend: str, model: str, max_depth: int
@@ -250,7 +345,7 @@ Format your response as JSON:
 Be specific and actionable. Search queries should be concrete and diverse."""
 
         try:
-            response = await self.llm_service.generate_response(
+            response = await self._call_llm(
                 message=planning_prompt,
                 backend=backend,
                 model=model,
@@ -259,9 +354,6 @@ Be specific and actionable. Search queries should be concrete and diverse."""
                     "max_tokens": 1000,
                 },
             )
-
-            self.llm_calls_count += 1
-            self.tokens_used += response.get("tokens", {}).get("total", 0)
 
             # Parse JSON response
             content = response.get("content", "")
@@ -497,15 +589,12 @@ Evidence collected from {len(evidence)} sources.
 What important information is still missing? List 2-3 specific gaps."""
 
         try:
-            response = await self.llm_service.generate_response(
+            response = await self._call_llm(
                 message=gap_prompt,
                 backend=backend,
                 model=model,
                 config={"temperature": 0.4, "max_tokens": 300},
             )
-
-            self.llm_calls_count += 1
-            self.tokens_used += response.get("tokens", {}).get("total", 0)
 
             content = response.get("content", "")
             gaps = [
@@ -530,15 +619,12 @@ What important information is still missing? List 2-3 specific gaps."""
 Generate 2-3 targeted search queries. Be specific and actionable."""
 
         try:
-            response = await self.llm_service.generate_response(
+            response = await self._call_llm(
                 message=queries_prompt,
                 backend=backend,
                 model=model,
                 config={"temperature": 0.5, "max_tokens": 200},
             )
-
-            self.llm_calls_count += 1
-            self.tokens_used += response.get("tokens", {}).get("total", 0)
 
             content = response.get("content", "")
             queries = [
@@ -654,15 +740,12 @@ Format as JSON:
 }}"""
 
         try:
-            response = await self.llm_service.generate_response(
+            response = await self._call_llm(
                 message=analysis_prompt,
                 backend=backend,
                 model=model,
                 config={"temperature": 0.2, "max_tokens": 500},
             )
-
-            self.llm_calls_count += 1
-            self.tokens_used += response.get("tokens", {}).get("total", 0)
 
             content = response.get("content", "")
 
@@ -720,15 +803,12 @@ Generate a professional report with:
 Be factual, cite confidence levels, and acknowledge uncertainties."""
 
         try:
-            response = await self.llm_service.generate_response(
+            response = await self._call_llm(
                 message=synthesis_prompt,
                 backend=backend,
                 model=model,
                 config={"temperature": 0.4, "max_tokens": 1500},
             )
-
-            self.llm_calls_count += 1
-            self.tokens_used += response.get("tokens", {}).get("total", 0)
 
             content = response.get("content", "")
 
@@ -814,9 +894,70 @@ Be factual, cite confidence levels, and acknowledge uncertainties."""
         return citations
 
     def _generate_research_id(self, query: str) -> str:
-        """Generate unique research ID from query"""
-        return hashlib.md5(query.encode()).hexdigest()[:12]
+        """Stable id derived from the normalized query."""
+        return hashlib.md5(query.strip().lower().encode()).hexdigest()[:12]
 
-    def get_cached_research(self, research_id: str) -> Optional[ResearchResult]:
-        """Retrieve cached research result"""
-        return self.research_cache.get(research_id)
+    async def get_cached_research(self, research_id: str) -> Optional[ResearchResult]:
+        """Retrieve a persisted research result (memory cache, then Mongo)."""
+        return await self._load_cached(research_id)
+
+    async def list_cached(self) -> List[Dict[str, Any]]:
+        """Summaries of all persisted research results (for cache stats)."""
+        if self.db_service is None:
+            return [
+                {
+                    "research_id": r.research_id,
+                    "query": r.query,
+                    "created_at": r.created_at.isoformat(),
+                    "sources": len(r.evidence),
+                    "cache_hits": r.metadata.cache_hits,
+                }
+                for r in self._memory_cache.values()
+            ]
+        docs = await self.db_service.db.research_results.find(
+            {}, {"_id": 0, "research_id": 1, "query": 1, "created_at": 1, "evidence": 1, "metadata": 1}
+        ).to_list(length=100)
+        return [
+            {
+                "research_id": d["research_id"],
+                "query": d["query"],
+                "created_at": d["created_at"],
+                "sources": len(d.get("evidence", [])),
+                "cache_hits": d.get("metadata", {}).get("cache_hits", 0),
+            }
+            for d in docs
+        ]
+
+    async def clear_cache(self) -> int:
+        """Clear memory cache and persisted results. Returns count removed."""
+        count = len(self._memory_cache)
+        self._memory_cache.clear()
+        if self.db_service is not None:
+            result = await self.db_service.db.research_results.delete_many({})
+            count = result.deleted_count
+        return count
+
+
+# ── (de)serialization between ResearchResult dataclasses and Mongo docs ───────
+
+
+def _serialize_result(result: "ResearchResult") -> Dict[str, Any]:
+    """Convert a ResearchResult to a Mongo-storable dict (datetimes preserved)."""
+    return asdict(result)
+
+
+def _deserialize_result(doc: Dict[str, Any]) -> "ResearchResult":
+    """Rebuild a ResearchResult from a stored Mongo document."""
+    return ResearchResult(
+        research_id=doc["research_id"],
+        query=doc["query"],
+        plan=ResearchPlan(**doc["plan"]),
+        evidence=[Evidence(**{k: v for k, v in e.items() if k != "content_chunks"},
+                            content_chunks=[ContentChunk(**c) for c in e.get("content_chunks", [])])
+                  for e in doc["evidence"]],
+        reasoning_trace=[ReasoningStep(**s) for s in doc["reasoning_trace"]],
+        final_report=FinalReport(**doc["final_report"]),
+        citations=doc["citations"],
+        metadata=ResearchMetadata(**doc["metadata"]),
+        created_at=doc["created_at"],
+    )

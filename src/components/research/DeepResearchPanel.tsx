@@ -5,14 +5,29 @@ import {
   AlertCircle,
   CheckCircle2,
   Brain,
-  FileText,
-  Lightbulb,
 } from "lucide-react";
-import { motion } from "framer-motion";
 import { useDeepResearchStore } from "../../store/deepResearchStore";
 import { useSettingsStore } from "../../store/settingsStore";
-import { deepResearchService } from "../../services/deepResearchService";
-import { ResearchStage } from "../../types";
+import { streamDeepResearch } from "../../api/stream";
+import type { ResearchResult, ResearchStage } from "../../types";
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { Textarea } from "../ui/textarea";
+import { Label } from "../ui/label";
+import { NumberTicker } from "../ui/number-ticker";
+import { cn } from "@/lib/utils";
+
+const STAGES: ResearchStage[] = ["planning", "searching", "reasoning", "synthesizing"];
+const STAGE_LABEL: Record<string, string> = {
+  idle: "Ready",
+  planning: "Planning",
+  searching: "Searching",
+  reasoning: "Reasoning",
+  synthesizing: "Synthesizing",
+  complete: "Complete",
+  cached: "Complete",
+  error: "Error",
+};
 
 export const DeepResearchPanel: React.FC = () => {
   const [query, setQuery] = useState("");
@@ -33,149 +48,92 @@ export const DeepResearchPanel: React.FC = () => {
   } = useDeepResearchStore();
 
   const { settings } = useSettingsStore();
-  const activeBackend = settings.activeBackend;
-  const activeModel = settings.activeModel;
 
   const handleResearch = async () => {
     if (!query.trim()) return;
+    setIsResearching(true);
+    setError(null);
+    clearCurrentResearch();
 
     try {
-      setIsResearching(true);
-      setError(null);
-      clearCurrentResearch();
-
-      updateStage("planning", "Generating research plan...", 10);
-
-      setTimeout(() => {
-        updateStage("searching", "Conducting multi-level search...", 30);
-      }, 1000);
-
-      setTimeout(() => {
-        updateStage(
-          "reasoning",
-          "Analyzing evidence with multi-hop reasoning...",
-          60
-        );
-      }, 3000);
-
-      setTimeout(() => {
-        updateStage("synthesizing", "Synthesizing final report...", 85);
-      }, 5000);
-
-      const result = await deepResearchService.conductResearch({
+      for await (const event of streamDeepResearch({
         query,
-        backend: activeBackend,
-        model: activeModel,
+        backend: settings.activeBackend,
+        model: settings.activeModel,
         max_depth: maxDepth,
         max_sources: maxSources,
-      });
-
-      updateStage("complete", "Research complete!", 100);
-      setCurrentResearch(result);
-      addToHistory(result);
-      setIsResearching(false);
+      })) {
+        if (event.stage === "complete" || event.stage === "cached") {
+          updateStage("complete", "Research complete", 100);
+          const result = event.result as ResearchResult;
+          setCurrentResearch(result);
+          addToHistory(result);
+        } else {
+          updateStage(
+            event.stage as ResearchStage,
+            event.message || STAGE_LABEL[event.stage] || "",
+            event.progress
+          );
+        }
+      }
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Research failed";
-      setError(errorMessage);
-      updateStage("error", errorMessage, 0);
+      const message = err instanceof Error ? err.message : "Research failed";
+      setError(message);
+      updateStage("error", message, 0);
+    } finally {
+      setIsResearching(false);
     }
   };
 
-  const getStageIcon = (stage: ResearchStage) => {
-    switch (stage) {
-      case "planning":
-        return <FileText className="w-5 h-5 text-gray-400 animate-pulse" />;
-      case "searching":
-        return <Search className="w-5 h-5 text-gray-400 animate-pulse" />;
-      case "reasoning":
-        return <Brain className="w-5 h-5 text-gray-400 animate-pulse" />;
-      case "synthesizing":
-        return <Lightbulb className="w-5 h-5 text-gray-400 animate-pulse" />;
-      case "complete":
-        return <CheckCircle2 className="w-5 h-5 text-accent-green" />;
-      case "error":
-        return <AlertCircle className="w-5 h-5 text-accent-red" />;
-      default:
-        return <Search className="w-5 h-5 text-gray-500" />;
-    }
-  };
-
-  const getStageLabel = (stage: ResearchStage) => {
-    switch (stage) {
-      case "planning":
-        return "Planning";
-      case "searching":
-        return "Searching";
-      case "reasoning":
-        return "Reasoning";
-      case "synthesizing":
-        return "Synthesizing";
-      case "complete":
-        return "Complete";
-      case "error":
-        return "Error";
-      default:
-        return "Ready";
-    }
-  };
+  const currentIndex = STAGES.indexOf(progress.stage as ResearchStage);
 
   return (
-    <div className="liquid-glass p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center space-x-3">
-        <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center">
-          <Brain className="w-6 h-6 text-primary" />
+    <Card className="space-y-6 p-6">
+      <div className="flex items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/15">
+          <Brain className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <h2 className="text-xl font-semibold text-gray-100">Deep Research</h2>
-          <p className="text-sm text-gray-500">Multi-hop reasoning with evidence synthesis</p>
+          <h2 className="font-display text-2xl leading-none">Deep Research</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Multi-hop reasoning with evidence synthesis
+          </p>
         </div>
       </div>
 
-      {/* Research Input */}
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-400 mb-2">
-            Research Question
-          </label>
-          <textarea
+        <div className="space-y-2">
+          <Label>Research Question</Label>
+          <Textarea
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="What would you like to research in depth?"
-            className="liquid-input resize-none"
             rows={3}
             disabled={isResearching}
           />
         </div>
 
-        {/* Configuration */}
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
-              Research Depth
-            </label>
+          <div className="space-y-2">
+            <Label>Research Depth</Label>
             <select
               value={maxDepth}
               onChange={(e) => setMaxDepth(Number(e.target.value))}
-              className="liquid-select"
               disabled={isResearching}
+              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               <option value={1}>Basic (1 level)</option>
               <option value={2}>Detailed (2 levels)</option>
               <option value={3}>Comprehensive (3 levels)</option>
             </select>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
-              Max Sources
-            </label>
+          <div className="space-y-2">
+            <Label>Max Sources</Label>
             <select
               value={maxSources}
               onChange={(e) => setMaxSources(Number(e.target.value))}
-              className="liquid-select"
               disabled={isResearching}
+              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               <option value={5}>Quick (5 sources)</option>
               <option value={10}>Standard (10 sources)</option>
@@ -185,79 +143,61 @@ export const DeepResearchPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Start Button */}
-        <motion.button
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
+        <Button
+          className="w-full"
           onClick={handleResearch}
           disabled={isResearching || !query.trim()}
-          className="w-full liquid-button-primary py-3.5 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isResearching ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Researching...</span>
+              <Loader2 className="h-4 w-4 animate-spin" /> Researching…
             </>
           ) : (
             <>
-              <Search className="w-5 h-5" />
-              <span>Start Deep Research</span>
+              <Search className="h-4 w-4" /> Start Deep Research
             </>
           )}
-        </motion.button>
+        </Button>
       </div>
 
-      {/* Progress Indicator */}
       {(isResearching || progress.stage !== "idle") && (
-        <div className="space-y-4">
-          {/* Progress Bar */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center space-x-2">
-                {getStageIcon(progress.stage)}
-                <span className="text-gray-300">
-                  {getStageLabel(progress.stage)}
-                </span>
-              </div>
-              <span className="text-gray-500">{progress.progress}%</span>
-            </div>
-            <div className="liquid-progress">
-              <div
-                className={`liquid-progress-fill ${
-                  progress.stage === "error"
-                    ? "!bg-accent-red"
-                    : progress.stage === "complete"
-                    ? "!bg-accent-green"
-                    : ""
-                }`}
-                style={{ width: `${progress.progress}%` }}
-              />
-            </div>
-            <p className="text-sm text-gray-500">{progress.message}</p>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium">{STAGE_LABEL[progress.stage]}</span>
+            <span className="font-mono text-muted-foreground">{progress.progress}%</span>
           </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all duration-500",
+                progress.stage === "error"
+                  ? "bg-destructive"
+                  : progress.stage === "complete"
+                    ? "bg-emerald-500"
+                    : "bg-primary"
+              )}
+              style={{ width: `${progress.progress}%` }}
+            />
+          </div>
+          <p className="text-sm text-muted-foreground">{progress.message}</p>
 
-          {/* Stage Indicators */}
           <div className="grid grid-cols-4 gap-2">
-            {(
-              ["planning", "searching", "reasoning", "synthesizing"] as const
-            ).map((stage) => {
-              const stageIndex = ["planning", "searching", "reasoning", "synthesizing"].indexOf(stage);
-              const currentIndex = ["planning", "searching", "reasoning", "synthesizing"].indexOf(progress.stage);
-              const isActive = progress.stage === stage;
-              const isComplete = currentIndex > stageIndex;
-
+            {STAGES.map((stage, i) => {
+              const active = progress.stage === stage;
+              const done = currentIndex > i || progress.stage === "complete";
               return (
                 <div
                   key={stage}
-                  className={`p-2 rounded-xl text-center text-xs transition-all ${
-                    isActive
-                      ? "bg-primary/20 text-primary border border-primary/30"
-                      : isComplete
-                      ? "bg-accent-green/10 text-accent-green border border-accent-green/20"
-                      : "bg-liquid-frosted border border-liquid-border text-gray-500"
-                  }`}
+                  className={cn(
+                    "rounded-md border px-2 py-1.5 text-center text-xs transition-colors",
+                    active
+                      ? "border-primary/40 bg-primary/15 text-primary"
+                      : done
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                        : "border-border text-muted-foreground"
+                  )}
                 >
-                  {getStageLabel(stage)}
+                  {STAGE_LABEL[stage]}
                 </div>
               );
             })}
@@ -265,40 +205,33 @@ export const DeepResearchPanel: React.FC = () => {
         </div>
       )}
 
-      {/* Error Display */}
       {error && (
-        <div className="p-4 rounded-2xl bg-accent-red/10 border border-accent-red/30 flex items-start space-x-3">
-          <AlertCircle className="w-5 h-5 text-accent-red flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
           <div>
-            <h4 className="font-medium text-accent-red">Research Failed</h4>
-            <p className="text-sm text-accent-red/80 mt-1">{error}</p>
+            <h4 className="font-medium text-destructive">Research Failed</h4>
+            <p className="mt-1 text-sm text-destructive/80">{error}</p>
           </div>
         </div>
       )}
 
-      {/* Quick Stats */}
       {currentResearch && (
-        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-liquid-border">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">
-              {currentResearch.evidence_count}
+        <div className="grid grid-cols-3 gap-4 border-t border-border pt-4">
+          {[
+            { label: "Sources", value: currentResearch.evidence_count, decimals: 0 },
+            { label: "Insights", value: currentResearch.reasoning_trace.length, decimals: 0 },
+            { label: "Time", value: currentResearch.metadata.time_taken, decimals: 1, suffix: "s" },
+          ].map((s) => (
+            <div key={s.label} className="text-center">
+              <div className="flex items-center justify-center gap-1 font-mono text-2xl font-bold text-primary">
+                <CheckCircle2 className="hidden h-0 w-0" />
+                <NumberTicker value={s.value} decimalPlaces={s.decimals} suffix={s.suffix} />
+              </div>
+              <div className="text-xs text-muted-foreground">{s.label}</div>
             </div>
-            <div className="text-xs text-gray-500">Sources</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">
-              {currentResearch.reasoning_trace.length}
-            </div>
-            <div className="text-xs text-gray-500">Insights</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-accent-green">
-              {currentResearch.metadata.time_taken.toFixed(1)}s
-            </div>
-            <div className="text-xs text-gray-500">Time</div>
-          </div>
+          ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 };

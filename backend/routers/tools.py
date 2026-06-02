@@ -1,48 +1,46 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import List, Dict, Any
+"""Standalone tool endpoints: web search and RAG query."""
 
-from services.search_service import SearchService
+from typing import List
+
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
+
+from dependencies import get_rag_service, get_search_service
 from services.rag_service import RAGService
+from services.search_service import SearchService
 
 router = APIRouter()
-search_service = SearchService()
-rag_service = RAGService()
 
 
 class SearchRequest(BaseModel):
-    query: str
+    query: str = Field(..., min_length=1)
     max_results: int = 5
-    scrape_content: bool = True  # Enable content scraping by default
+    scrape_content: bool = True
 
 
 class RAGQueryRequest(BaseModel):
-    query: str
+    query: str = Field(..., min_length=1)
     file_ids: List[str] = []
     top_k: int = 3
 
 
 @router.post("/search")
-async def web_search(request: SearchRequest):
-    """Perform an enhanced web search with content scraping"""
-    try:
-        results = await search_service.search(
-            request.query, request.max_results, request.scrape_content
-        )
-        return {"results": results}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def web_search(
+    request: SearchRequest, search: SearchService = Depends(get_search_service)
+):
+    """Web search with optional content scraping."""
+    results = await search.search(
+        request.query, request.max_results, request.scrape_content
+    )
+    return {"results": results}
 
 
 @router.post("/rag/query")
-async def rag_query(request: RAGQueryRequest):
-    """Query RAG system"""
-    try:
-        results = await rag_service.query(
-            query=request.query,
-            file_ids=request.file_ids,
-            top_k=request.top_k,
-        )
-        return {"results": results}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def rag_query(
+    request: RAGQueryRequest, rag: RAGService = Depends(get_rag_service)
+):
+    """Query the RAG vector store."""
+    results = await rag.query(
+        query=request.query, file_ids=request.file_ids, top_k=request.top_k
+    )
+    return {"results": results}

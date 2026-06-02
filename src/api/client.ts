@@ -3,14 +3,34 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
 
-// Create axios instance
+/**
+ * Base URL for the API.
+ *
+ * - In the bundled app it resolves from the build-time `VITE_API_URL`
+ *   (set to `/api` so the nginx reverse proxy forwards to the backend).
+ * - As an npm package, consumers can override it at runtime via
+ *   {@link configureApi} without rebuilding.
+ */
+export const DEFAULT_API_BASE_URL =
+  (import.meta.env?.VITE_API_URL as string | undefined) ?? "/api";
+
 export const apiClient = axios.create({
-  baseURL: "/api",
+  baseURL: DEFAULT_API_BASE_URL,
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+/** Override the API base URL (for npm-package consumers). */
+export function configureApi(options: { baseUrl: string }): void {
+  apiClient.defaults.baseURL = options.baseUrl;
+}
+
+/** The base URL currently in effect (used by SSE helpers that bypass axios). */
+export function getApiBaseUrl(): string {
+  return (apiClient.defaults.baseURL as string) || DEFAULT_API_BASE_URL;
+}
 
 // Request interceptor
 apiClient.interceptors.request.use(
@@ -48,9 +68,6 @@ apiClient.interceptors.response.use(
       const delay = RETRY_DELAY * Math.pow(2, config._retry - 1);
       await new Promise((resolve) => setTimeout(resolve, delay));
 
-      console.log(
-        `Retrying request (attempt ${config._retry}/${MAX_RETRIES})...`
-      );
       return apiClient(config);
     }
 

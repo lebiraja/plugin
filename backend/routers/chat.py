@@ -1,13 +1,16 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
-from fastapi.responses import StreamingResponse
-import asyncio
+"""Stateless chat endpoints (not tied to a persisted session)."""
 
+from typing import Dict, List, Optional
+
+from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+
+from dependencies import get_llm_service
 from services.llm_service import LLMService
+from sse import sse_event
 
 router = APIRouter()
-llm_service = LLMService()
 
 
 class ModelConfig(BaseModel):
@@ -24,7 +27,7 @@ class ChatMessage(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1)
     backend: str
     model: str
     config: ModelConfig
@@ -39,38 +42,35 @@ class ChatResponse(BaseModel):
 
 
 @router.post("", response_model=ChatResponse)
-async def send_message(request: ChatRequest):
-    """Send a message and get a response from the LLM"""
-    try:
-        # Convert history to dict format
-        history_dicts = [msg.dict() for msg in request.history]
-
-        response = await llm_service.generate_response(
-            message=request.message,
-            backend=request.backend,
-            model=request.model,
-            config=request.config.dict(),
-            history=history_dicts,
-        )
-        return response
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def send_message(
+    request: ChatRequest, llm: LLMService = Depends(get_llm_service)
+):
+    """Send a message and get a complete response."""
+    history = [msg.model_dump() for msg in request.history]
+    return await llm.generate_response(
+        message=request.message,
+        backend=request.backend,
+        model=request.model,
+        config=request.config.model_dump(),
+        history=history,
+    )
 
 
 @router.post("/stream")
-async def stream_message(request: ChatRequest):
-    """Stream a response from the LLM"""
-    try:
+async def stream_message(
+    request: ChatRequest, llm: LLMService = Depends(get_llm_service)
+):
+    """Stream a response token-by-token as Server-Sent Events."""
+    history = [msg.model_dump() for msg in request.history]
 
-        async def generate():
-            async for chunk in llm_service.stream_response(
-                message=request.message,
-                backend=request.backend,
-                model=request.model,
-                config=request.config.dict(),
-            ):
-                yield chunk
+    async def generate():
+        async for event in llm.stream_chat(
+            message=request.message,
+            backend=request.backend,
+            model=request.model,
+            config=request.config.model_dump(),
+            history=history,
+        ):
+            yield sse_event(event)
 
-        return StreamingResponse(generate(), media_type="text/event-stream")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return StreamingResponse(generate(), media_type="text/event-stream")
