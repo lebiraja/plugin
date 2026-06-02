@@ -1,17 +1,17 @@
-import axios from "axios";
+import { apiClient } from "./client";
 
-const API_BASE_URL = "http://localhost:8000/api";
+export interface SessionModelConfig {
+  temperature?: number;
+  topP?: number;
+  maxTokens?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+}
 
 export interface CreateSessionRequest {
   backend: string;
   model: string;
-  config?: {
-    temperature?: number;
-    topP?: number;
-    maxTokens?: number;
-    frequencyPenalty?: number;
-    presencePenalty?: number;
-  };
+  config?: SessionModelConfig;
 }
 
 export interface Session {
@@ -21,6 +21,30 @@ export interface Session {
   updated_at: string;
   message_count: number;
   total_tokens: number;
+}
+
+export interface SessionMessage {
+  message_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp: string;
+  tokens?: { prompt: number; completion: number; total: number };
+  latency?: number;
+  model?: string;
+  backend?: string;
+  citations?: Array<{ title: string; url: string; snippet: string }>;
+  retrieved_context?: Array<{ source: string; content: string; similarity: number }>;
+}
+
+export interface SessionFile {
+  file_id: string;
+  filename: string;
+  path: string;
+  type: string;
+  size: number;
+  embedded: boolean;
+  chunks: number;
+  uploaded_at: string;
 }
 
 export interface SessionDetail {
@@ -34,8 +58,8 @@ export interface SessionDetail {
     temperature: number;
     maxTokens: number;
   };
-  messages: any[];
-  files: any[];
+  messages: SessionMessage[];
+  files: SessionFile[];
   metadata: {
     total_messages: number;
     total_tokens: number;
@@ -48,25 +72,34 @@ export interface SessionDetail {
   };
 }
 
+export interface ToolsEnabled {
+  web_search?: boolean;
+  rag?: boolean;
+  deep_research?: boolean;
+}
+
 export interface SendMessageRequest {
   message: string;
-  config?: any;
-  tools_enabled?: {
-    web_search?: boolean;
-    rag?: boolean;
-    deep_research?: boolean;
-  };
+  config?: SessionModelConfig;
+  tools_enabled?: ToolsEnabled;
+}
+
+export interface AssistantMessageResponse {
+  message_id: string;
+  role: "assistant";
+  content: string;
+  tokens?: { prompt: number; completion: number; total: number };
+  latency?: number;
+  citations?: Array<{ title: string; url: string; snippet: string }>;
+  retrieved_context?: Array<{ source: string; content: string; similarity: number }>;
 }
 
 export const sessionApi = {
   async createSession(
     request: CreateSessionRequest
   ): Promise<{ session_id: string; title: string }> {
-    const response = await axios.post(
-      `${API_BASE_URL}/sessions/create`,
-      request
-    );
-    return response.data;
+    const { data } = await apiClient.post("/sessions/create", request);
+    return data;
   },
 
   async listSessions(
@@ -74,66 +107,62 @@ export const sessionApi = {
     limit = 50,
     sort = "updated_at"
   ): Promise<{ sessions: Session[]; total: number }> {
-    const response = await axios.get(`${API_BASE_URL}/sessions`, {
+    const { data } = await apiClient.get("/sessions", {
       params: { skip, limit, sort },
     });
-    return response.data;
+    return data;
   },
 
   async getSession(sessionId: string): Promise<SessionDetail> {
-    const response = await axios.get(`${API_BASE_URL}/sessions/${sessionId}`);
-    return response.data;
+    const { data } = await apiClient.get(`/sessions/${sessionId}`);
+    return data;
   },
 
   async sendMessage(
     sessionId: string,
     request: SendMessageRequest
-  ): Promise<any> {
-    const response = await axios.post(
-      `${API_BASE_URL}/sessions/${sessionId}/message`,
+  ): Promise<AssistantMessageResponse> {
+    const { data } = await apiClient.post(
+      `/sessions/${sessionId}/message`,
       request
     );
-    return response.data;
+    return data;
   },
 
   async generateTitle(sessionId: string): Promise<{ title: string }> {
-    const response = await axios.post(
-      `${API_BASE_URL}/sessions/${sessionId}/generate-title`
+    const { data } = await apiClient.post(
+      `/sessions/${sessionId}/generate-title`
     );
-    return response.data;
+    return data;
   },
 
   async renameSession(
     sessionId: string,
     title: string
   ): Promise<{ success: boolean; title: string }> {
-    const response = await axios.patch(
-      `${API_BASE_URL}/sessions/${sessionId}/rename`,
-      { title }
-    );
-    return response.data;
+    const { data } = await apiClient.patch(`/sessions/${sessionId}/rename`, {
+      title,
+    });
+    return data;
   },
 
   async deleteSession(sessionId: string): Promise<{ success: boolean }> {
-    const response = await axios.delete(
-      `${API_BASE_URL}/sessions/${sessionId}`
-    );
-    return response.data;
+    const { data } = await apiClient.delete(`/sessions/${sessionId}`);
+    return data;
   },
 
-  async uploadFile(_sessionId: string, file: File): Promise<any> {
+  /**
+   * Upload a file into a session and embed it for RAG. Scoped to the session so
+   * the chunks are retrievable in that session's RAG queries.
+   */
+  async uploadFile(sessionId: string, file: File): Promise<SessionFile> {
     const formData = new FormData();
     formData.append("file", file);
-
-    const response = await axios.post(
-      `${API_BASE_URL}/files/upload`,
+    const { data } = await apiClient.post(
+      `/sessions/${sessionId}/upload`,
       formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
+      { headers: { "Content-Type": "multipart/form-data" } }
     );
-    return response.data;
+    return data;
   },
 };

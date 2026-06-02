@@ -1,37 +1,29 @@
-import axios from "axios";
+import { apiClient } from "../api/client";
 import { DeepResearchRequest, ResearchResult } from "../types";
 
-const API_BASE_URL = "http://localhost:8000/api";
-
 export const deepResearchService = {
-  /**
-   * Conduct comprehensive deep research
-   */
+  /** Conduct comprehensive deep research (blocking). */
   async conductResearch(request: DeepResearchRequest): Promise<ResearchResult> {
-    const response = await axios.post<ResearchResult>(
-      `${API_BASE_URL}/deep-research/conduct`,
+    const { data } = await apiClient.post<ResearchResult>(
+      "/deep-research/conduct",
       request
     );
-    return response.data;
+    return data;
   },
 
-  /**
-   * Get research status by ID
-   */
+  /** Get research status by id. */
   async getResearchStatus(researchId: string): Promise<{
     research_id: string;
     status: string;
     progress?: string;
   }> {
-    const response = await axios.get(
-      `${API_BASE_URL}/deep-research/status/${researchId}`
+    const { data } = await apiClient.get(
+      `/deep-research/status/${researchId}`
     );
-    return response.data;
+    return data;
   },
 
-  /**
-   * Get cache statistics
-   */
+  /** Cache statistics. */
   async getCacheStats(): Promise<{
     cache_size: number;
     cached_research: Array<{
@@ -42,23 +34,17 @@ export const deepResearchService = {
       cache_hits: number;
     }>;
   }> {
-    const response = await axios.get(
-      `${API_BASE_URL}/deep-research/cache/stats`
-    );
-    return response.data;
+    const { data } = await apiClient.get("/deep-research/cache/stats");
+    return data;
   },
 
-  /**
-   * Clear research cache
-   */
+  /** Clear the research cache. */
   async clearCache(): Promise<{
     success: boolean;
     cleared_count: number;
     message: string;
   }> {
-    const response = await axios.delete(
-      `${API_BASE_URL}/deep-research/cache/clear`
-    );
-    return response.data;
+    const { data } = await apiClient.delete("/deep-research/cache/clear");
+    return data;
   },
 };
