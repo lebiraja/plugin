@@ -10,14 +10,18 @@ routers trivially testable: override a provider in a test to inject a fake.
 
 from functools import lru_cache
 
+from typing import TYPE_CHECKING
+
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from services import db_service, rag_service
-from services.deep_research_service import DeepResearchService
+from services import db_service
 from services.llm_service import LLMService
-from services.rag_service import RAGService
 from services.search_service import SearchService
 from services.session_service import SessionService
+
+if TYPE_CHECKING:
+    from services.deep_research_service import DeepResearchService
+    from services.rag_service import RAGService
 
 
 @lru_cache(maxsize=1)
@@ -30,11 +34,12 @@ def get_search_service() -> SearchService:
     return SearchService()
 
 
-def get_rag_service() -> RAGService:
-    # RAGService is a singleton constructed in services/__init__ (with its
-    # db_service wired in). Reuse that instance rather than rebuilding the
-    # embedding model.
-    return rag_service
+def get_rag_service() -> "RAGService":
+    # Lazily resolve the singleton (constructed on first access) so the
+    # embedding model only loads when RAG is actually used.
+    import services
+
+    return services.rag_service
 
 
 @lru_cache(maxsize=1)
@@ -43,7 +48,9 @@ def get_session_service() -> SessionService:
 
 
 @lru_cache(maxsize=1)
-def get_deep_research_service() -> DeepResearchService:
+def get_deep_research_service() -> "DeepResearchService":
+    from services.deep_research_service import DeepResearchService
+
     return DeepResearchService(
         llm_service=get_llm_service(),
         search_service=get_search_service(),
