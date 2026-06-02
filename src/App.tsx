@@ -78,6 +78,7 @@ function App() {
             width={leftSidebarWidth}
             onToggle={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
             onResize={setLeftSidebarWidth}
+            onOpenSettings={() => setIsSettingsOpen(true)}
           />
 
           {/* Main Content Area - Content First Layout (z-base) */}

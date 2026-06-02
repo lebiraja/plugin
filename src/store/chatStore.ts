@@ -61,14 +61,18 @@ export const useChatStore = create<ChatStore>((set) => ({
 
   updateStats: (tokens, latency) =>
     set((state) => {
+      // Each call corresponds to one completed assistant exchange. Track the
+      // count here so the running average is correct regardless of how the
+      // message list is managed (ChatInterface holds messages in local state).
+      const newCount = state.stats.totalMessages + 1
       const newTotalTokens = state.stats.totalTokens + tokens
-      const messageCount = state.stats.totalMessages
       const newAvgLatency =
-        (state.stats.averageLatency * (messageCount - 1) + latency) / messageCount
+        (state.stats.averageLatency * (newCount - 1) + latency) / newCount
 
       return {
         stats: {
           ...state.stats,
+          totalMessages: newCount,
           totalTokens: newTotalTokens,
           averageLatency: newAvgLatency,
         },

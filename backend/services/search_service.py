@@ -38,19 +38,31 @@ MAX_CONCURRENT_SCRAPES = 5
 class SearchService:
     """Web search with optional page-content scraping."""
 
-    def __init__(self):
-        self.serper_api_key = settings.serper_api_key
+    def __init__(self, secret_service=None):
+        # The Serper key is resolved per-search: a runtime key stored (encrypted)
+        # via the Settings UI takes precedence over the SERPER_API_KEY env var.
+        self._secret_service = secret_service
         self._content_cache: Dict[str, Dict[str, Any]] = {}
         self._scrape_semaphore = asyncio.Semaphore(MAX_CONCURRENT_SCRAPES)
+
+    async def _resolve_serper_key(self) -> str:
+        if self._secret_service is not None:
+            from services.secret_service import SERPER_KEY
+
+            stored = await self._secret_service.get_secret(SERPER_KEY)
+            if stored:
+                return stored
+        return settings.serper_api_key
 
     async def search(
         self, query: str, max_results: int = 5, scrape_content: bool = True
     ) -> List[Dict[str, Any]]:
         results: List[Dict[str, Any]] = []
 
-        if self.serper_api_key:
+        serper_key = await self._resolve_serper_key()
+        if serper_key:
             try:
-                results = await self._serper_search(query, max_results)
+                results = await self._serper_search(query, max_results, serper_key)
             except Exception as exc:
                 logger.warning("Serper failed (%s); falling back to DuckDuckGo", exc)
 
@@ -67,13 +79,15 @@ class SearchService:
 
     # ── providers ─────────────────────────────────────────────────────────────
 
-    async def _serper_search(self, query: str, max_results: int) -> List[Dict[str, Any]]:
+    async def _serper_search(
+        self, query: str, max_results: int, api_key: str
+    ) -> List[Dict[str, Any]]:
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(
                 "https://google.serper.dev/search",
                 json={"q": query, "num": max_results},
                 headers={
-                    "X-API-KEY": self.serper_api_key,
+                    "X-API-KEY": api_key,
                     "Content-Type": "application/json",
                 },
             )

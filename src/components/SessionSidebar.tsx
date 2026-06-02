@@ -11,6 +11,7 @@ import {
   ChevronDown,
   RefreshCw,
   PanelLeftClose,
+  Settings,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSessionStore } from "../store/sessionStore";
@@ -35,6 +36,7 @@ interface SessionSidebarProps {
   onToggle?: () => void;
   onResize?: (width: number) => void;
   onClose?: () => void;
+  onOpenSettings?: () => void;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -49,6 +51,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
   width = 320,
   onToggle,
   onResize,
+  onOpenSettings,
 }) => {
   const {
     sessions,
@@ -189,11 +192,25 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
 
       <div className="flex items-center justify-between px-4 py-3">
         <span className="font-display text-xl">Sessions</span>
-        {onToggle && (
-          <Button variant="ghost" size="icon" onClick={onToggle} className="h-7 w-7">
-            <PanelLeftClose className="h-4 w-4" />
-          </Button>
-        )}
+        <div className="flex items-center gap-0.5">
+          {onOpenSettings && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onOpenSettings}
+              className="h-7 w-7"
+              title="Settings"
+              aria-label="Open settings"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          )}
+          {onToggle && (
+            <Button variant="ghost" size="icon" onClick={onToggle} className="h-7 w-7">
+              <PanelLeftClose className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="px-4 pb-3">

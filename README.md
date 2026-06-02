@@ -126,9 +126,10 @@ Key endpoints:
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/health` | Health check with provider status map |
-| GET | `/api/providers` | List configured providers |
+| GET | `/api/providers` | List configured providers (masked keys) |
 | POST | `/api/providers` | Add/update a provider key |
 | GET | `/api/models/{provider_id}` | List models for a provider |
+| GET / PUT | `/api/integrations/search` | View / set the Serper web-search key |
 | POST | `/api/sessions` | Create a new chat session |
 | GET | `/api/sessions` | List all sessions |
 | POST | `/api/sessions/{id}/message/stream` | Stream a chat message (SSE) |
