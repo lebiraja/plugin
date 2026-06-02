@@ -1,62 +1,36 @@
-# Local LLM Chat Interface 🤖✨
+# Plugin Chat 🤖✨
 
-A modern, feature-rich chat interface for interacting with local LLM backends like Ollama and LM Studio. Built with React, TypeScript, and FastAPI, featuring **persistent chat sessions**, MongoDB storage, RAG (Retrieval-Augmented Generation), web search, and a beautiful animated UI.
+A self-hosted, multi-provider LLM chat app. Talk to **local** models (Ollama,
+LM Studio) and **cloud** providers (OpenAI, OpenRouter, Groq, Together, DeepSeek,
+or any OpenAI-compatible endpoint) from one UI. Built with React + TypeScript +
+FastAPI, with persistent sessions, MongoDB storage, RAG, web search, deep
+research, and token streaming. Ships as a **single Docker image**.
 
 ![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![React](https://img.shields.io/badge/react-18.3+-61dafb.svg)
 ![MongoDB](https://img.shields.io/badge/mongodb-7.0+-47A248.svg)
-[![npm version](https://img.shields.io/npm/v/@lebiraja/plugintool.svg)](https://www.npmjs.com/package/@lebiraja/plugintool)
 
-## 📦 npm Package
-
-This project is available as an npm package for easy integration into your React projects.
-
-### Install
+## 🚀 Quick start (Docker)
 
 ```bash
-npm install @lebiraja/plugintool
+cp .env.example .env          # set ENCRYPTION_KEY (for cloud keys), SERPER_API_KEY, …
+docker compose up --build     # builds the single app image + Mongo + Ollama
 ```
 
-### Usage
+Open <http://localhost:3100>.
 
-```tsx
-import {
-  App,
-  ChatInterface,
-  UnifiedChatInterface,
-  useChatStore,
-  useSettingsStore
-} from '@lebiraja/plugintool';
-import type { Message, AppSettings } from '@lebiraja/plugintool';
+Or run the published image:
 
-// Use the full App component
-function MyApp() {
-  return <App />;
-}
-
-// Or use individual components
-function CustomChat() {
-  const { messages, addMessage } = useChatStore();
-
-  return (
-    <ChatInterface
-      onToggleRightSidebar={() => {}}
-      isRightSidebarOpen={true}
-    />
-  );
-}
+```bash
+docker pull lebiraja/plugin:latest
+IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 ```
 
-### Available Exports
-
-| Category | Exports |
-|----------|---------|
-| **Components** | `App`, `ChatInterface`, `UnifiedChatInterface`, `MessageList`, `SessionSidebar`, `RightSidebar`, `SettingsModal`, `FileCard`, `LeftSidebar`, `ErrorBoundary`, `BackendStatusBanner`, `MarkdownRenderer`, `DeepResearchPanel`, `ResearchResultsView` |
-| **Stores** | `useChatStore`, `useSettingsStore`, `useSessionStore`, `useFileStore`, `useDeepResearchStore` |
-| **Hooks** | `useBackendStatus` |
-| **Types** | `Message`, `LLMBackend`, `ModelConfig`, `ToolsConfig`, `AppSettings`, `ChatStats`, `SearchResult`, `RAGResult`, `ResearchResult`, and more |
+The app is one container (nginx + FastAPI via supervisord); MongoDB and Ollama
+run alongside. See [docs/docker.md](docs/docker.md) for details and
+[docs/architecture.md](docs/architecture.md) for the design.
 
 ---
 
